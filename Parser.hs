@@ -54,30 +54,30 @@ parseAtom = do first <- letter <|> symbol
                  atom -> Atom atom
 
 parseNumber :: Parser LispVal
-parseNumber = fmap Number $ (read <$> many1 digit) <|> char '#' *> parseNumber'
+parseNumber = parseInt <|> char '#' *> parseNumber'
   where
+    parseInt     = Number . read <$> many1 digit
     parseNumber' = char 'o' *> parseOct
                <|> char 'x' *> parseHex
                <|> char 'b' *> parseBin
+               <|> char 'd' *> parseFloat
 
-parseBin :: Parser Integer
-parseBin = fst . head . readBin <$> many1 (oneOf "01") where
+parseBin :: Parser LispVal
+parseBin = fmap Number $ fst . head . readBin <$> many1 (oneOf "01") where
   readBin = readInt 2 (`elem` "01") digitToInt
 
-parseOct :: Parser Integer
-parseOct = fst . head . readOct <$> many1 octDigit
+parseOct :: Parser LispVal
+parseOct = fmap Number $ fst . head . readOct <$> many1 octDigit
 
-parseHex :: Parser Integer
-parseHex = fst . head . readHex <$> many1 hexDigit
+parseHex :: Parser LispVal
+parseHex = fmap Number $ fst . head . readHex <$> many1 hexDigit
 
 parseFloat :: Parser LispVal
-parseFloat = Float <$> parseFloat'
-  where
-    parseFloat' = string "#d" *> (fst . head . readFloat <$> float')
-    float' = do int  <- many1 digit
-                _    <- char '.'
-                frac <- many1 digit
-                return $ int ++ "." ++ frac
+parseFloat = Float <$> fst . head . readFloat <$> float' where
+  float' = do int  <- many1 digit
+              _    <- char '.'
+              frac <- many1 digit
+              return $ int ++ "." ++ frac
 
 parseList :: Parser LispVal
 parseList = List <$> parseExpr `sepBy` spaces
@@ -85,7 +85,6 @@ parseList = List <$> parseExpr `sepBy` spaces
 parseExpr :: Parser LispVal
 parseExpr =
       try parseNumber
-  <|> try parseFloat
   <|> parseChar
   <|> parseAtom
   <|> parseString
