@@ -79,8 +79,20 @@ parseFloat = Float <$> fst . head . readFloat <$> float' where
               frac <- many1 digit
               return $ int ++ "." ++ frac
 
-parseList :: Parser LispVal
-parseList = List <$> parseExpr `sepBy` spaces
+parseQuoted :: Parser LispVal
+parseQuoted = do
+  char '\''
+  e <- parseExpr
+  return $ List [Atom "quote", e]
+
+parseListOrPairs :: Parser LispVal
+parseListOrPairs = do
+  char '('
+  exprs <- parseExpr `endBy` spaces
+  val   <- (DottedList exprs <$> (char '.' *> spaces *> parseExpr))
+       <|> pure (List exprs)
+  char ')'
+  return val
 
 parseExpr :: Parser LispVal
 parseExpr =
@@ -89,18 +101,7 @@ parseExpr =
   <|> parseAtom
   <|> parseString
   <|> parseQuoted
-  <|> (char '(' *> (try parseList <|> parseDottedList) <* char ')')
-
-parseDottedList :: Parser LispVal
-parseDottedList = DottedList
-  <$> parseExpr `endBy` spaces
-  <*> (char '.' *> spaces *> parseExpr)
-
-parseQuoted :: Parser LispVal
-parseQuoted = do
-  char '\''
-  e <- parseExpr
-  return $ List [Atom "quote", e]
+  <|> parseListOrPairs
 
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of
