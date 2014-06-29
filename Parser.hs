@@ -57,7 +57,7 @@ parseNumber :: Parser LispVal
 parseNumber = fmap Number $ (read <$> many1 digit) <|> char '#' *> parseNumber'
   where
     parseNumber' = char 'o' *> parseOct
-               <|> char 'h' *> parseHex
+               <|> char 'x' *> parseHex
                <|> char 'b' *> parseBin
 
 parseBin :: Parser Integer
