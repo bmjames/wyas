@@ -11,10 +11,13 @@ import Numeric (readOct, readHex, readInt, readFloat)
 
 import Text.ParserCombinators.Parsec
 
+import qualified Data.Vector as V
+
 
 data LispVal = Atom       String
              | List       [LispVal]
              | DottedList [LispVal] LispVal
+             | Vector     (V.Vector LispVal)
              | Number     Integer
              | Float      Double
              | String     String
@@ -94,10 +97,15 @@ parseListOrPairs = do
   char ')'
   return val
 
+parseVector :: Parser LispVal
+parseVector = fmap (Vector . V.fromList) $
+  string "#(" *> parseExpr `sepBy` spaces <* char ')'
+
 parseExpr :: Parser LispVal
 parseExpr =
       try parseNumber
-  <|> parseChar
+  <|> try parseChar
+  <|> try parseVector
   <|> parseAtom
   <|> parseString
   <|> parseQuoted
