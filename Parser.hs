@@ -1,29 +1,16 @@
 module Parser where
 
-import Control.Applicative hiding (many, (<|>))
-import Control.Monad      (forever)
+import Data
 
+import Control.Applicative hiding (many, (<|>))
 import Data.Char    (digitToInt, toLower, toUpper)
 import Data.Functor (($>))
 import Data.Traversable (traverse)
-
 import Numeric (readOct, readHex, readInt, readFloat)
-
 import Text.ParserCombinators.Parsec
 
 import qualified Data.Vector as V
 
-
-data LispVal = Atom       String
-             | List       [LispVal]
-             | DottedList [LispVal] LispVal
-             | Vector     (V.Vector LispVal)
-             | Number     Integer
-             | Float      Double
-             | String     String
-             | Bool       Bool
-             | Character  Char
-             deriving Show
 
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -114,7 +101,4 @@ parseExpr =
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of
   Left err -> "No match: " ++ show err
-  Right v  -> "Found value: " ++ show v
-
-main :: IO ()
-main = forever $ getLine >>= putStrLn . readExpr
+  Right v  -> show v
