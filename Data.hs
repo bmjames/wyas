@@ -45,6 +45,10 @@ isVector :: LispVal -> Bool
 isVector (Vector _) = True
 isVector _          = False
 
+isSymbol :: LispVal -> Bool
+isSymbol (Atom _) = True
+isSymbol _        = False
+
 showVal :: LispVal -> String
 showVal val = case val of
   Atom name       -> name

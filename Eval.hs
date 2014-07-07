@@ -46,6 +46,10 @@ primitives = [
   , ("list?",    typeTest isList)
   , ("pair?",    typeTest isPair)
   , ("vector?",  typeTest isVector)
+  , ("symbol?",  typeTest isSymbol)
+
+  , ("symbol->string", symbolToString)
+  , ("string->symbol", stringToSymbol)
   ]
 
 numericBinOp :: BinOp Integer -> LispFun
@@ -55,6 +59,12 @@ numericBinOp op params = Number $ foldl1 op $ map unpackNum params where
 
 typeTest :: (LispVal -> Bool) -> LispFun
 typeTest f [v] = Bool $ f v
+
+symbolToString :: LispFun
+symbolToString [Atom s] = String s
+
+stringToSymbol :: LispFun
+stringToSymbol [String s] = Atom s
 
 mergeEither :: Either a a -> a
 mergeEither (Left a)  = a
