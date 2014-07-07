@@ -12,6 +12,39 @@ data LispVal = Atom       String
              | Bool       Bool
              | Character  Char
 
+isString :: LispVal -> Bool
+isString (String _) = True
+isString _          = False
+
+isBool :: LispVal -> Bool
+isBool (Bool _) = True
+isBool _        = False
+
+isChar :: LispVal -> Bool
+isChar (Character _) = True
+isChar _             = False
+
+isNumber :: LispVal -> Bool
+isNumber (Number _) = True
+isNumber (Float _)  = True
+isNumber _          = False
+
+isInteger :: LispVal -> Bool
+isInteger (Number _) = True
+isInteger _          = False
+
+isList :: LispVal -> Bool
+isList (List _) = True
+isList _        = False
+
+isPair :: LispVal -> Bool
+isPair (DottedList _ _) = True
+isPair _                = False
+
+isVector :: LispVal -> Bool
+isVector (Vector _) = True
+isVector _          = False
+
 showVal :: LispVal -> String
 showVal val = case val of
   Atom name       -> name
