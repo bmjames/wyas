@@ -36,13 +36,29 @@ apply fun args = maybe (throwError $ NotFunction "Unrecognized primitive functio
 
 primitives :: [(String, LispFun)]
 primitives = [
-    ("+", numericBinOp (+))
-  , ("-", numericBinOp (-))
-  , ("*", numericBinOp (*))
-  , ("/", numericBinOp div)
-  , ("mod", numericBinOp mod)
-  , ("quotient", numericBinOp quot)
+    ("+",         numericBinOp (+))
+  , ("-",         numericBinOp (-))
+  , ("*",         numericBinOp (*))
+  , ("/",         numericBinOp div)
+  , ("mod",       numericBinOp mod)
+  , ("quotient",  numericBinOp quot)
   , ("remainder", numericBinOp rem)
+
+  , ("=",  numBoolBinOp (==))
+  , ("<",  numBoolBinOp (<))
+  , (">",  numBoolBinOp (>))
+  , ("/=", numBoolBinOp (/=))
+  , (">=", numBoolBinOp (<=))
+  , ("<=", numBoolBinOp (<=))
+
+  , ("&&", boolBoolBinOp (&&))
+  , ("||", boolBoolBinOp (||))
+
+  , ("string=?",  strBoolBinOp (==))
+  , ("string<?",  strBoolBinOp (<))
+  , ("string>?",  strBoolBinOp (>))
+  , ("string<=?", strBoolBinOp (<=))
+  , ("string>=?", strBoolBinOp (>=))
 
   , ("string?",  typeTest isString)
   , ("bool?",    typeTest isBool)
@@ -58,12 +74,26 @@ primitives = [
   , ("string->symbol", stringToSymbol)
   ]
 
+  where
+    numBoolBinOp  = boolBinOp unpackNum
+    strBoolBinOp  = boolBinOp unpackString
+    boolBoolBinOp = boolBinOp unpackBool
+
 numericBinOp :: BinOp Integer -> LispFun
 numericBinOp op [n1, n2] = fmap Number . op <$> unpackNum n1 <*> unpackNum n2
-  where
-    unpackNum (Number n) = return n
-    unpackNum notNum     = throwError $ TypeMismatch "number" notNum
 numericBinOp _ vs        = throwError $ NumArgs 2 vs
+
+unpackNum :: LispVal -> ThrowsError Integer
+unpackNum (Number n) = return n
+unpackNum notNum     = throwError $ TypeMismatch "number" notNum
+
+unpackBool :: LispVal -> ThrowsError Bool
+unpackBool (Bool b) = return b
+unpackBool notBool  = throwError $ TypeMismatch "boolean" notBool
+
+unpackString :: LispVal -> ThrowsError String
+unpackString (String s) = return s
+unpackString notString = throwError $ TypeMismatch "string" notString
 
 typeTest :: (LispVal -> Bool) -> LispFun
 typeTest f [v] = return . Bool $ f v
@@ -79,15 +109,12 @@ stringToSymbol [String s] = return $ Atom s
 stringToSymbol [v]        = throwError $ TypeMismatch "string" v
 stringToSymbol vs         = throwError $ NumArgs 2 vs
 
-mergeEither :: Either a a -> a
-mergeEither (Left a)  = a
-mergeEither (Right a) = a
-
-mergeMap :: (a -> c) -> (b -> c) -> Either a b -> c
-mergeMap f g = mergeEither . bimap f g
+boolBinOp :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> LispFun
+boolBinOp f op [a1, a2] = fmap Bool . op <$> f a1 <*> f a2
+boolBinOp _ _  as       = throwError $ NumArgs 2 as
 
 main :: IO ()
 main = forever $ do
   putStr "> "
   l <- getLine
-  putStrLn $ mergeMap show show $ eval =<< readExpr l
+  putStrLn $ either show show $ eval =<< readExpr l
