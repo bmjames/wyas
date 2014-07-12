@@ -14,6 +14,7 @@ data LispVal = Atom       String
              | String     String
              | Bool       Bool
              | Character  Char
+             deriving Eq
 
 isString :: LispVal -> Bool
 isString (String _) = True

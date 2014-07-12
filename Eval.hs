@@ -80,6 +80,9 @@ primitives = [
   , ("car",  car)
   , ("cdr",  cdr)
   , ("cons", cons)
+
+  , ("eq?", eqv)
+  , ("eqv?", eqv)
   ]
 
   where
@@ -139,6 +142,10 @@ cons [x, List xs]          = return $ List (x:xs)
 cons [x, DottedList xs x'] = return $ DottedList (x:xs) x'
 cons [x1, x2]              = return $ DottedList [x1] x2
 cons badArgs               = throwError $ NumArgs 2 badArgs
+
+eqv :: LispFun
+eqv [v1, v2] = return $ Bool $ v1 == v2
+eqv badArgs  = throwError $ NumArgs 2 badArgs
 
 main :: IO ()
 main = forever $ do
