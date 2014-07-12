@@ -78,7 +78,7 @@ instance Show LispVal where
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
                | Parser Parsec.ParseError
-               | BadSpecialForm LispVal
+               | BadSpecialForm String LispVal
                | NotFunction String String
                | UnboundVar String String
                | Default String

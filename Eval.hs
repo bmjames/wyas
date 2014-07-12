@@ -23,17 +23,31 @@ eval val = case val of
   Character _ -> return val
 
   List [Atom "quote", v] -> return v
+
   List [Atom "if", p, conseq, alt] -> do result <- eval p
                                          case result of
                                            Bool False -> eval alt
                                            _          -> eval conseq
+
+  List (Atom "cond" : clauses) -> evalCond clauses
+
   List (Atom fun : args) -> apply fun =<< traverse eval args
 
   Vector vs -> Vector <$> traverse eval vs
 
   DottedList v1 v2 -> DottedList <$> traverse eval v1 <*> eval v2
 
-  badForm -> throwError $ BadSpecialForm badForm
+  badForm -> throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+evalCond :: LispFun
+evalCond [] = return $ Bool False
+evalCond [List [Atom "else", v]] = eval v
+evalCond (c:cs) = maybe (evalCond cs) return =<< evalClause c
+  where
+    evalClause (List [p, v]) = do b <- unpackBool =<< eval p
+                                  if b then Just <$> eval v else return Nothing
+    evalClause badClause = throwError $ BadSpecialForm
+                             "Invalid conditional clause" badClause
 
 apply :: String -> LispFun
 apply fun args = maybe (throwError $ NotFunction "Unrecognized primitive function" fun) ($ args) $ lookup fun primitives
