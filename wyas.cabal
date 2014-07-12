@@ -23,6 +23,5 @@ executable wyas
                      , parsec >=3.1 && <3.2
                      , vector >=0.10 && <0.11
                      , mtl >=2.2 && <2.3
-                     , bifunctors >=4 && <5
   -- hs-source-dirs:      
   default-language:    Haskell2010

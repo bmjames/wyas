@@ -7,10 +7,10 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Monad       (forever)
 import Control.Monad.Error (throwError)
 
-import Data.Bifunctor      (bimap)
 import Data.Traversable    (traverse)
 
 type LispFun = [LispVal] -> ThrowsError LispVal
+
 type BinOp a = a -> a -> a
 
 eval :: LispVal -> ThrowsError LispVal
@@ -23,6 +23,10 @@ eval val = case val of
   Character _ -> return val
 
   List [Atom "quote", v] -> return v
+  List [Atom "if", p, conseq, alt] -> do result <- eval p
+                                         case result of
+                                           Bool False -> eval alt
+                                           _          -> eval conseq
   List (Atom fun : args) -> apply fun =<< traverse eval args
 
   Vector vs -> Vector <$> traverse eval vs
