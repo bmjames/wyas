@@ -3,6 +3,8 @@ module Parser where
 import Data
 
 import Control.Applicative hiding (many, (<|>))
+import Control.Monad.Error (throwError)
+
 import Data.Char    (digitToInt, toLower, toUpper)
 import Data.Functor (($>))
 import Data.Traversable (traverse)
@@ -98,7 +100,7 @@ parseExpr =
   <|> parseQuoted
   <|> parseListOrPairs
 
-readExpr :: String -> Either String LispVal
+readExpr :: String -> ThrowsError LispVal
 readExpr input = case parse parseExpr "lisp" input of
-  Left err -> Left $ "No match: " ++ show err
-  Right v  -> Right v
+  Left err -> throwError $ Parser err
+  Right v  -> return v

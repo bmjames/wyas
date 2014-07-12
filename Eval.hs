@@ -3,30 +3,36 @@ module Eval where
 import Data
 import Parser
 
-import Control.Monad (forever)
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad       (forever)
+import Control.Monad.Error (throwError)
 
-type LispFun = [LispVal] -> LispVal
+import Data.Bifunctor      (bimap)
+import Data.Traversable    (traverse)
+
+type LispFun = [LispVal] -> ThrowsError LispVal
 type BinOp a = a -> a -> a
 
-eval :: LispVal -> LispVal
+eval :: LispVal -> ThrowsError LispVal
 eval val = case val of
-  Atom _      -> val
-  String _    -> val
-  Number _    -> val
-  Float _     -> val
-  Bool _      -> val
-  Character _ -> val
+  Atom _      -> return val
+  String _    -> return val
+  Number _    -> return val
+  Float _     -> return val
+  Bool _      -> return val
+  Character _ -> return val
 
-  List [Atom "quote", v] -> v
-  List (Atom fun : args) -> apply fun $ map eval args
+  List [Atom "quote", v] -> return v
+  List (Atom fun : args) -> apply fun =<< traverse eval args
 
-  List vs   -> List $ map eval vs
-  Vector vs -> Vector $ fmap eval vs
+  Vector vs -> Vector <$> traverse eval vs
 
-  DottedList v1 v2 -> DottedList (map eval v1) (eval v2)
+  DottedList v1 v2 -> DottedList <$> traverse eval v1 <*> eval v2
+
+  badForm -> throwError $ BadSpecialForm badForm
 
 apply :: String -> LispFun
-apply fun args = maybe (Bool False) ($ args) $ lookup fun primitives
+apply fun args = maybe (throwError $ NotFunction "Unrecognized primitive function" fun) ($ args) $ lookup fun primitives
 
 primitives :: [(String, LispFun)]
 primitives = [
@@ -53,25 +59,35 @@ primitives = [
   ]
 
 numericBinOp :: BinOp Integer -> LispFun
-numericBinOp op params = Number $ foldl1 op $ map unpackNum params where
-  unpackNum (Number n) = n
-  unpackNum _ = 0
+numericBinOp op [n1, n2] = fmap Number . op <$> unpackNum n1 <*> unpackNum n2
+  where
+    unpackNum (Number n) = return n
+    unpackNum notNum     = throwError $ TypeMismatch "number" notNum
+numericBinOp _ vs        = throwError $ NumArgs 2 vs
 
 typeTest :: (LispVal -> Bool) -> LispFun
-typeTest f [v] = Bool $ f v
+typeTest f [v] = return . Bool $ f v
+typeTest _ vs  = throwError $ NumArgs 2 vs
 
 symbolToString :: LispFun
-symbolToString [Atom s] = String s
+symbolToString [Atom s] = return $ String s
+symbolToString [v]      = throwError $ TypeMismatch "symbol" v
+symbolToString vs       = throwError $ NumArgs 2 vs
 
 stringToSymbol :: LispFun
-stringToSymbol [String s] = Atom s
+stringToSymbol [String s] = return $ Atom s
+stringToSymbol [v]        = throwError $ TypeMismatch "string" v
+stringToSymbol vs         = throwError $ NumArgs 2 vs
 
 mergeEither :: Either a a -> a
 mergeEither (Left a)  = a
 mergeEither (Right a) = a
 
+mergeMap :: (a -> c) -> (b -> c) -> Either a b -> c
+mergeMap f g = mergeEither . bimap f g
+
 main :: IO ()
 main = forever $ do
   putStr "> "
   l <- getLine
-  putStrLn $ mergeEither $ fmap (show . eval) $ readExpr l
+  putStrLn $ mergeMap show show $ eval =<< readExpr l

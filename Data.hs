@@ -1,6 +1,9 @@
 module Data where
 
+import Control.Monad.Error (Error(..), catchError)
+
 import qualified Data.Vector as V
+import qualified Text.Parsec as Parsec
 
 data LispVal = Atom       String
              | List       [LispVal]
@@ -70,3 +73,21 @@ showVal val = case val of
 
 instance Show LispVal where
   show = showVal
+
+data LispError = NumArgs Integer [LispVal]
+               | TypeMismatch String LispVal
+               | Parser Parsec.ParseError
+               | BadSpecialForm LispVal
+               | NotFunction String String
+               | UnboundVar String String
+               | Default String
+               deriving Show
+
+instance Error LispError where
+  noMsg = Default "An error has occurred"
+  strMsg = Default
+
+type ThrowsError = Either LispError
+
+trapError :: ThrowsError String -> ThrowsError String
+trapError action = catchError action (return . show)
