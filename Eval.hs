@@ -76,6 +76,10 @@ primitives = [
 
   , ("symbol->string", symbolToString)
   , ("string->symbol", stringToSymbol)
+
+  , ("car",  car)
+  , ("cdr",  cdr)
+  , ("cons", cons)
   ]
 
   where
@@ -116,6 +120,25 @@ stringToSymbol vs         = throwError $ NumArgs 2 vs
 boolBinOp :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> LispFun
 boolBinOp f op [a1, a2] = fmap Bool . op <$> f a1 <*> f a2
 boolBinOp _ _  as       = throwError $ NumArgs 2 as
+
+car :: LispFun
+car [List (x:_)]         = return x
+car [DottedList (x:_) _] = return x
+car [badArg]             = throwError $ TypeMismatch "pair" badArg
+car badArgs              = throwError $ NumArgs 1 badArgs
+
+cdr :: LispFun
+cdr [List (_:xs)]         = return $ List xs
+cdr [DottedList [_] x]    = return x
+cdr [DottedList (_:xs) x] = return $ DottedList xs x
+cdr [badArg]              = throwError $ TypeMismatch "pair" badArg
+cdr badArgs               = throwError $ NumArgs 1 badArgs
+
+cons :: LispFun
+cons [x, List xs]          = return $ List (x:xs)
+cons [x, DottedList xs x'] = return $ DottedList (x:xs) x'
+cons [x1, x2]              = return $ DottedList [x1] x2
+cons badArgs               = throwError $ NumArgs 2 badArgs
 
 main :: IO ()
 main = forever $ do
