@@ -4,7 +4,7 @@ import Data
 import Parser
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad       (forever)
+import Control.Monad       (forever, unless)
 import Control.Monad.Error (throwError)
 
 import Data.Traversable    (traverse)
@@ -31,6 +31,8 @@ eval val = case val of
 
   List (Atom "cond" : clauses) -> evalCond clauses
 
+  List (Atom "case" : key : clauses) -> flip evalCase clauses =<< eval key
+
   List (Atom fun : args) -> apply fun =<< traverse eval args
 
   Vector vs -> Vector <$> traverse eval vs
@@ -42,15 +44,28 @@ eval val = case val of
 evalCond :: LispFun
 evalCond [] = return $ Bool False
 evalCond [List [Atom "else", v]] = eval v
-evalCond (c:cs) = maybe (evalCond cs) return =<< evalClause c
+evalCond (c:cs) = maybe (evalCond cs) return =<< evalClause =<< eval c
   where
     evalClause (List [p, v]) = do b <- unpackBool =<< eval p
                                   if b then Just <$> eval v else return Nothing
     evalClause badClause = throwError $ BadSpecialForm
                              "Invalid conditional clause" badClause
 
+evalCase :: LispVal -> LispFun
+evalCase _   []     = return $ Bool False
+evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
+  where
+    evalClause (List [List ds, v]) = return $
+      if any (eqvInternal key) ds then Just v else Nothing
+    evalClause badClause = throwError $ BadSpecialForm
+                             "Invalid case clause" badClause
+
 apply :: String -> LispFun
-apply fun args = maybe (throwError $ NotFunction "Unrecognized primitive function" fun) ($ args) $ lookup fun primitives
+apply fun args =
+  maybe
+    (throwError $ NotFunction "Unrecognized primitive function" fun)
+    ($ args)
+    (lookup fun primitives)
 
 primitives :: [(String, LispFun)]
 primitives = [
@@ -158,11 +173,14 @@ cons [x1, x2]              = return $ DottedList [x1] x2
 cons badArgs               = throwError $ NumArgs 2 badArgs
 
 eqv :: LispFun
-eqv [v1, v2] = return $ Bool $ v1 == v2
+eqv [v1, v2] = return $ Bool $ eqvInternal v1 v2
 eqv badArgs  = throwError $ NumArgs 2 badArgs
+
+eqvInternal :: LispVal -> LispVal -> Bool
+eqvInternal = (==)
 
 main :: IO ()
 main = forever $ do
   putStr "> "
   l <- getLine
-  putStrLn $ either show show $ eval =<< readExpr l
+  unless (null l) $ putStrLn $ either show show $ eval =<< readExpr l
