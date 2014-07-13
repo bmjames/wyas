@@ -1,10 +1,8 @@
 module Eval where
 
 import Data
-import Parser
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad       (forever, unless)
 import Control.Monad.Error (throwError)
 
 import Data.Traversable    (traverse)
@@ -178,9 +176,3 @@ eqv badArgs  = throwError $ NumArgs 2 badArgs
 
 eqvInternal :: LispVal -> LispVal -> Bool
 eqvInternal = (==)
-
-main :: IO ()
-main = forever $ do
-  putStr "> "
-  l <- getLine
-  unless (null l) $ putStrLn $ either show show $ eval =<< readExpr l

@@ -16,7 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 executable wyas
-  main-is:             Parser.hs
+  main-is:             Main.hs
   other-modules:       Data, Eval
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
