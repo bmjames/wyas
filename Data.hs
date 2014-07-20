@@ -2,6 +2,8 @@ module Data where
 
 import Control.Monad.Error (Error(..), catchError)
 
+import Data.Foldable       (foldMap)
+
 import qualified Data.Vector as V
 import qualified Text.Parsec as Parsec
 
@@ -14,6 +16,7 @@ data LispVal = Atom       String
              | String     String
              | Bool       Bool
              | Character  Char
+             | Function   [String] (Maybe String) LispVal
              deriving Eq
 
 isString :: LispVal -> Bool
@@ -69,6 +72,9 @@ showVal val = case val of
   Character '\n'  -> "#\\newline"
   Character c     -> ['#', '\\', c]
 
+  Function params vararg  _ ->
+    "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
+
   where
     unwordsVal = unwords . map showVal
 
@@ -79,8 +85,8 @@ data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
                | Parser Parsec.ParseError
                | BadSpecialForm String LispVal
-               | NotFunction String String
-               | UnboundVar String String
+               | NotFunction String LispVal
+               | UnboundVar String
                | Default String
                deriving Show
 
@@ -90,5 +96,3 @@ instance Error LispError where
 
 type ThrowsError = Either LispError
 
-trapError :: ThrowsError String -> ThrowsError String
-trapError action = catchError action (return . show)

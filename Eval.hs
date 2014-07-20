@@ -3,22 +3,36 @@ module Eval where
 import Data
 
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad.Error (throwError)
+import Control.Monad.Error (ErrorT, runErrorT, throwError)
+import Control.Monad.State (State, evalState, get, put, gets, modify)
 
 import Data.Traversable    (traverse)
 
-type LispFun = [LispVal] -> ThrowsError LispVal
+import qualified Data.Map as Map
+
+type Env = Map.Map String LispVal
+
+type Eval = ErrorT LispError (State Env)
+
+type LispFun = [LispVal] -> Eval LispVal
+
+nullEnv :: Env
+nullEnv = Map.empty
+
+runEval :: Env -> Eval a -> ThrowsError a
+runEval env = flip evalState env . runErrorT
 
 type BinOp a = a -> a -> a
 
-eval :: LispVal -> ThrowsError LispVal
+eval :: LispVal -> Eval LispVal
 eval val = case val of
-  Atom _      -> return val
   String _    -> return val
   Number _    -> return val
   Float _     -> return val
   Bool _      -> return val
   Character _ -> return val
+
+  Atom ident  -> getVar ident
 
   List [Atom "quote", v] -> return v
 
@@ -31,13 +45,29 @@ eval val = case val of
 
   List (Atom "case" : key : clauses) -> flip evalCase clauses =<< eval key
 
-  List (Atom fun : args) -> apply fun =<< traverse eval args
+  List [Atom "lambda", List params, body] ->
+    return $ Function (map showVal params) Nothing body
+
+  List (Atom fun : args) -> applyPrimitive fun =<< traverse eval args
+
+  List (fun : args) -> do  f  <- eval fun
+                           as <- traverse eval args
+                           applyFun f as
 
   Vector vs -> Vector <$> traverse eval vs
 
   DottedList v1 v2 -> DottedList <$> traverse eval v1 <*> eval v2
 
   badForm -> throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+defineVar :: String -> LispVal -> Eval ()
+defineVar name value = modify $ Map.insert name value
+
+getVar :: String -> Eval LispVal
+getVar name = do maybeValue <- gets $ Map.lookup name
+                 case maybeValue of
+                   Just v  -> return v
+                   Nothing -> throwError $ UnboundVar name
 
 evalCond :: LispFun
 evalCond [] = return $ Bool False
@@ -58,12 +88,24 @@ evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
     evalClause badClause = throwError $ BadSpecialForm
                              "Invalid case clause" badClause
 
-apply :: String -> LispFun
-apply fun args =
+applyPrimitive :: String -> LispFun
+applyPrimitive fun args =
   maybe
-    (throwError $ NotFunction "Unrecognized primitive function" fun)
+    (throwError $ NotFunction "Unrecognized primitive function" $ Atom fun)
     ($ args)
     (lookup fun primitives)
+
+applyFun :: LispVal -> LispFun
+applyFun fun args = case fun of
+  Function params Nothing _ | length params /= length args ->
+    throwError $ NumArgs (toInteger $ length params) args
+  Function params vararg body -> do
+    curEnv <- get
+    mapM_ (uncurry defineVar) (zip params args)
+    value <- eval body
+    put curEnv
+    return value
+  notFun -> throwError $ NotFunction "Not a function" notFun
 
 primitives :: [(String, LispFun)]
 primitives = [
@@ -121,15 +163,15 @@ numericBinOp :: BinOp Integer -> LispFun
 numericBinOp op [n1, n2] = fmap Number . op <$> unpackNum n1 <*> unpackNum n2
 numericBinOp _ vs        = throwError $ NumArgs 2 vs
 
-unpackNum :: LispVal -> ThrowsError Integer
+unpackNum :: LispVal -> Eval Integer
 unpackNum (Number n) = return n
 unpackNum notNum     = throwError $ TypeMismatch "number" notNum
 
-unpackBool :: LispVal -> ThrowsError Bool
+unpackBool :: LispVal -> Eval Bool
 unpackBool (Bool b) = return b
 unpackBool notBool  = throwError $ TypeMismatch "boolean" notBool
 
-unpackString :: LispVal -> ThrowsError String
+unpackString :: LispVal -> Eval String
 unpackString (String s) = return s
 unpackString notString = throwError $ TypeMismatch "string" notString
 
@@ -147,7 +189,7 @@ stringToSymbol [String s] = return $ Atom s
 stringToSymbol [v]        = throwError $ TypeMismatch "string" v
 stringToSymbol vs         = throwError $ NumArgs 2 vs
 
-boolBinOp :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> LispFun
+boolBinOp :: (LispVal -> Eval a) -> (a -> a -> Bool) -> LispFun
 boolBinOp f op [a1, a2] = fmap Bool . op <$> f a1 <*> f a2
 boolBinOp _ _  as       = throwError $ NumArgs 2 as
 
