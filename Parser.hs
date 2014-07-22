@@ -5,14 +5,12 @@ import Data
 import Control.Applicative hiding (many, (<|>))
 import Control.Monad.Error (throwError)
 
-import Data.Char    (digitToInt, toLower, toUpper)
-import Data.Functor (($>))
+import Data.Char        (digitToInt, toLower, toUpper)
 import Data.Traversable (traverse)
-import Numeric (readOct, readHex, readInt, readFloat)
+import Numeric          (readOct, readHex, readInt, readFloat)
 import Text.ParserCombinators.Parsec
 
 import qualified Data.Vector as V
-
 
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -21,19 +19,19 @@ parseString :: Parser LispVal
 parseString = String <$> (char '"' *> many char' <* char '"')
   where
     char' = try (char '\\' *> escapedChar) <|> noneOf "\""
-    escapedChar =     (char '"' $> '"')
-                  <|> (char 'n' $> '\n')
-                  <|> (char 'r' $> '\r')
-                  <|> (char 't' $> '\t')
-                  <|> (char '\\' $> '\\')
+    escapedChar =     ('"' <$ char '"')
+                  <|> ('\n' <$ char 'n')
+                  <|> ('\r' <$ char 'r')
+                  <|> ('\t' <$ char 't')
+                  <|> ('\\' <$ char '\\')
 
 parseChar :: Parser LispVal
 parseChar = Character <$> char'
   where
     char'     = string "#\\" *> (try namedChar <|> anyChar <|> pure ' ')
-    namedChar =     (iString "space"   $> ' ')
-                <|> (iString "newline" $> '\n')
-                <|> (iString "tab"     $> '\t')
+    namedChar =     (' ' <$ iString "space")
+                <|> ('\n' <$ iString "newline")
+                <|> ('\t' <$ iString "tab")
     iString   = traverse iChar
     iChar c   = char (toLower c) <|> char (toUpper c)
 
