@@ -5,7 +5,6 @@ import Control.Monad.Error (Error(..), catchError)
 import Data.Foldable       (foldMap)
 
 import qualified Data.Vector as V
-import qualified Text.Parsec as Parsec
 
 data LispVal = Atom       String
              | List       [LispVal]
@@ -83,7 +82,7 @@ instance Show LispVal where
 
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
-               | Parser Parsec.ParseError
+               | Parser String
                | BadSpecialForm String LispVal
                | NotFunction String LispVal
                | UnboundVar String

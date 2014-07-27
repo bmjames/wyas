@@ -1,50 +1,57 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parser where
 
 import Data
 
-import Control.Applicative hiding (many, (<|>))
+import Control.Applicative
 import Control.Monad.Error (throwError)
 
+import Data.Attoparsec.Text
+import Data.Text        (Text)
 import Data.Char        (digitToInt, toLower, toUpper)
 import Data.Traversable (traverse)
+
 import Numeric          (readOct, readHex, readInt, readFloat)
-import Text.ParserCombinators.Parsec
 
 import qualified Data.Vector as V
 
+
 symbol :: Parser Char
-symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
+symbol = satisfy (inClass "!#$%&|*+-/:<=>?@^_~") <?> "symbol"
 
 parseString :: Parser LispVal
-parseString = String <$> (char '"' *> many char' <* char '"')
+parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
   where
-    char' = try (char '\\' *> escapedChar) <|> noneOf "\""
-    escapedChar =     ('"' <$ char '"')
+    char' = try (char '\\' *> escapedChar) <|> notChar '"'
+    escapedChar =     ('"'  <$ char '"')
                   <|> ('\n' <$ char 'n')
                   <|> ('\r' <$ char 'r')
                   <|> ('\t' <$ char 't')
                   <|> ('\\' <$ char '\\')
 
 parseChar :: Parser LispVal
-parseChar = Character <$> char'
+parseChar = Character <$> char' <?> "character"
   where
     char'     = string "#\\" *> (try namedChar <|> anyChar <|> pure ' ')
-    namedChar =     (' ' <$ iString "space")
+    namedChar =     (' '  <$ iString "space")
                 <|> ('\n' <$ iString "newline")
                 <|> ('\t' <$ iString "tab")
+    iString :: String -> Parser String
     iString   = traverse iChar
     iChar c   = char (toLower c) <|> char (toUpper c)
 
 parseAtom :: Parser LispVal
-parseAtom = do first <- letter <|> symbol
-               rest  <- many (letter <|> digit <|> symbol)
-               return $ case first:rest of
-                 "#t" -> Bool True
-                 "#f" -> Bool False
-                 atom -> Atom atom
+parseAtom = atom <?> "symbol" where
+  atom = do first <- letter <|> symbol
+            rest  <- many (letter <|> digit <|> symbol)
+            return $ case first:rest of
+              "#t" -> Bool True
+              "#f" -> Bool False
+              sym  -> Atom sym
 
 parseNumber :: Parser LispVal
-parseNumber = parseInt <|> char '#' *> parseNumber'
+parseNumber = (parseInt <|> char '#' *> parseNumber') <?> "number"
   where
     parseInt     = Number . read <$> many1 digit
     parseNumber' = char 'o' *> parseOct
@@ -53,14 +60,18 @@ parseNumber = parseInt <|> char '#' *> parseNumber'
                <|> char 'd' *> parseFloat
 
 parseBin :: Parser LispVal
-parseBin = fmap Number $ fst . head . readBin <$> many1 (oneOf "01") where
-  readBin = readInt 2 (`elem` "01") digitToInt
+parseBin = parseBin' <?> "binary" where
+  parseBin' = fmap Number $ fst . head . readBin <$> many1 binDigit
+  binDigit  = satisfy (\c -> c == '0' || c == '1') <?> "'0' or '1'"
+  readBin   = readInt 2 (`elem` "01") digitToInt
 
 parseOct :: Parser LispVal
 parseOct = fmap Number $ fst . head . readOct <$> many1 octDigit
+  where octDigit = satisfy (inClass ['0'..'7']) <?> "'0'..'7'"
 
 parseHex :: Parser LispVal
 parseHex = fmap Number $ fst . head . readHex <$> many1 hexDigit
+  where hexDigit = satisfy (inClass $ ['0'..'9'] ++ ['a'..'f']) <?> "'0'..'f'"
 
 parseFloat :: Parser LispVal
 parseFloat = Float <$> fst . head . readFloat <$> float' where
@@ -78,15 +89,21 @@ parseQuoted = do
 parseListOrPairs :: Parser LispVal
 parseListOrPairs = do
   char '('
-  exprs <- parseExpr `endBy` spaces
-  val   <- (DottedList exprs <$> (char '.' *> spaces *> parseExpr))
-       <|> pure (List exprs)
+  es  <- exprs
+  val <- (dottedList es <?> "dotted list") <|> pure (List es)
   char ')'
   return val
 
+  where
+    dottedList es = DottedList es <$> (char '.' *> skipSpace *> parseExpr)
+
 parseVector :: Parser LispVal
-parseVector = fmap (Vector . V.fromList) $
-  string "#(" *> parseExpr `sepBy` spaces <* char ')'
+parseVector = Vector . V.fromList <$> vec where
+  vec = (string "#(" *> exprs <* char ')') <?> "vector"
+
+exprs :: Parser [LispVal]
+exprs = (parseExpr `endBy` skipSpace) <?> "[expr..]" where
+  endBy p sep = many (p <* sep)
 
 parseExpr :: Parser LispVal
 parseExpr =
@@ -98,7 +115,8 @@ parseExpr =
   <|> parseQuoted
   <|> parseListOrPairs
 
-readExpr :: String -> ThrowsError LispVal
-readExpr input = case parse parseExpr "lisp" input of
-  Left err -> throwError $ Parser err
-  Right v  -> return v
+readExpr :: Text -> ThrowsError LispVal
+readExpr input = case parse parseExpr input of
+  Fail _ _ err -> throwError $ Parser err
+  Partial _    -> throwError $ Parser "Incomplete input"
+  Done _ val   -> return val
