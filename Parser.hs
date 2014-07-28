@@ -114,9 +114,3 @@ parseExpr =
   <|> parseString
   <|> parseQuoted
   <|> parseListOrPairs
-
-readExpr :: Text -> ThrowsError LispVal
-readExpr input = case parse parseExpr input of
-  Fail _ _ err -> throwError $ Parser err
-  Partial _    -> throwError $ Parser "Incomplete input"
-  Done _ val   -> return val

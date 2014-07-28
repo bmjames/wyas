@@ -24,13 +24,16 @@ getInput prompt = do
 handleParseResult :: Result LispVal -> IO ()
 handleParseResult parseResult =
   case parseResult of
-    Fail _ _ parseErr -> putStrLn $ "*** " ++ parseErr
+    Fail _ msgs parseErr ->
+      traverse_ putErrLn (parseErr : msgs)
     Done _   val -> 
-      let output = either show show result
-          result = runEval nullEnv $ eval val
-      in putStrLn output
+      let result = runEval nullEnv $ eval val
+      in either (putErrLn . show) print result
     Partial resume ->
       getInput "... " >>= traverse_ (handleParseResult . resume)
+
+  where
+    putErrLn msg = putStrLn $ "*** " ++ msg
 
 main :: IO ()
 main = forever $
