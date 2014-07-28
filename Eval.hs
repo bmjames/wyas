@@ -45,6 +45,8 @@ eval val = case val of
 
   List (Atom "case" : key : clauses) -> flip evalCase clauses =<< eval key
 
+  List [Atom "define", Atom name, form] -> eval form >>= defineVar name
+
   List [Atom "lambda", List params, body] ->
     return $ Function (map showVal params) Nothing body
 
@@ -60,8 +62,10 @@ eval val = case val of
 
   badForm -> throwError $ BadSpecialForm "Unrecognized special form" badForm
 
-defineVar :: String -> LispVal -> Eval ()
-defineVar name value = modify $ Map.insert name value
+defineVar :: String -> LispVal -> Eval LispVal
+defineVar name value = do
+  modify $ Map.insert name value
+  return value
 
 getVar :: String -> Eval LispVal
 getVar name = do maybeValue <- gets $ Map.lookup name
