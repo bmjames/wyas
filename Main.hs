@@ -3,7 +3,7 @@
 module Main where
 
 import Parser
-import Eval
+import Eval (Env, nullEnv, eval, runEval)
 import Data (LispVal)
 
 import Control.Monad          (forever, void)

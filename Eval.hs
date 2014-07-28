@@ -2,6 +2,8 @@ module Eval where
 
 import Data
 
+import Prelude hiding (null)
+
 import Control.Applicative ((<$>), (<*>), (<|>))
 import Control.Monad.Error (ErrorT, runErrorT, throwError)
 import Control.Monad.State (State, runState, get, put, gets, modify)
@@ -162,6 +164,7 @@ primitives = [
   , ("car",  car)
   , ("cdr",  cdr)
   , ("cons", cons)
+  , ("null?", null)
 
   , ("eq?", eqv)
   , ("eqv?", eqv)
@@ -229,6 +232,12 @@ cons [x, List xs]          = return $ List (x:xs)
 cons [x, DottedList xs x'] = return $ DottedList (x:xs) x'
 cons [x1, x2]              = return $ DottedList [x1] x2
 cons badArgs               = throwError $ NumArgs 2 badArgs
+
+null :: LispFun
+null [List xs] = return $ Bool $ case xs of [] -> True
+                                            _  -> False
+null [notList] = throwError $ TypeMismatch "list" notList
+null badArgs   = throwError $ NumArgs 1 badArgs
 
 eqv :: LispFun
 eqv [v1, v2] = return $ Bool $ eqvInternal v1 v2
