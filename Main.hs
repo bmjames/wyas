@@ -3,8 +3,8 @@
 module Main where
 
 import Parser
-import Eval (Env, nullEnv, eval, runEval)
-import Data (LispVal)
+import Eval (nullEnv, eval, runEval)
+import Data (Env, LispVal)
 
 import Control.Monad          (forever, void)
 import Control.Monad.State    (StateT, runStateT, get, put)

@@ -2,9 +2,12 @@ module Data where
 
 import Control.Monad.Error (Error(..), catchError)
 
-import Data.Foldable       (foldMap)
+import Data.Foldable (foldMap)
+import Data.Map      (Map)
 
 import qualified Data.Vector as V
+
+type Env = Map String LispVal
 
 data LispVal = Atom       String
              | List       [LispVal]
@@ -15,7 +18,8 @@ data LispVal = Atom       String
              | String     String
              | Bool       Bool
              | Character  Char
-             | Function   [String] (Maybe String) LispVal
+             | Function   Env [String] (Maybe String) LispVal
+             | PrimFun    String
              deriving Eq
 
 isString :: LispVal -> Bool
@@ -71,8 +75,10 @@ showVal val = case val of
   Character '\n'  -> "#\\newline"
   Character c     -> ['#', '\\', c]
 
-  Function params vararg  _ ->
+  Function _ params vararg  _ ->
     "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
+
+  PrimFun fun     -> fun
 
   where
     unwordsVal = unwords . map showVal

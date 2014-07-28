@@ -8,12 +8,11 @@ import Control.Applicative ((<$>), (<*>), (<|>))
 import Control.Monad.Error (ErrorT, runErrorT, throwError)
 import Control.Monad.State (State, runState, get, put, gets, modify)
 
-import Data.Foldable    (foldrM)
+import Data.Functor     ((<$))
+import Data.Foldable    (foldrM, traverse_)
 import Data.Traversable (traverse)
 
 import qualified Data.Map as Map
-
-type Env = Map.Map String LispVal
 
 type Eval = ErrorT LispError (State Env)
 
@@ -34,8 +33,9 @@ eval val = case val of
   Float _     -> return val
   Bool _      -> return val
   Character _ -> return val
+  PrimFun _   -> return val
 
-  Atom ident  -> getVar ident
+  Atom ident  -> maybe (getVar ident) return (lookupPrimitive ident)
 
   List [Atom "quote", v] -> return v
 
@@ -50,10 +50,13 @@ eval val = case val of
 
   List [Atom "define", Atom name, form] -> eval form >>= defineVar name
 
-  List [Atom "lambda", List params, body] ->
-    return $ Function (map showVal params) Nothing body
+  List [Atom "lambda", List params, body] -> do
+    env <- get
+    return $ Function env (map showVal params) Nothing body
 
-  List (fun : args) -> applyFun fun =<< traverse eval args
+  List (fun : args) -> do f  <- eval fun
+                          as <- traverse eval args
+                          applyFun f as
 
   Vector vs -> Vector <$> traverse eval vs
 
@@ -93,8 +96,8 @@ evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
 
 applyFun :: LispVal -> LispFun
 applyFun fun args = case fun of
-  Atom f -> lookupFun f >>= ($ args)
-  val    -> applyUserFun val args
+  PrimFun f -> lookupFun f >>= ($ args)
+  val       -> applyUserFun val args
 
 lookupFun :: String -> Eval LispFun
 lookupFun name = do maybeVal <- findVar name
@@ -111,15 +114,21 @@ applyPrimitive fun args =
 
 applyUserFun :: LispVal -> LispFun
 applyUserFun fun args = case fun of
-  Function params Nothing _ | length params /= length args ->
+  Function _ params Nothing _ | length params /= length args ->
     throwError $ NumArgs (toInteger $ length params) args
-  Function params vararg body -> do
+  Function env params vararg body -> do
     curEnv <- get
-    mapM_ (uncurry defineVar) (zip params args)
+    put env
+    traverse_ (uncurry defineVar) (zip params args)
+    let varargs = List $ drop (length params) args
+    traverse_ (`defineVar` varargs) vararg
     value <- eval body
     put curEnv
     return value
   notFun -> throwError $ NotFunction "Not a function" notFun
+
+lookupPrimitive :: String -> Maybe LispVal
+lookupPrimitive fun = PrimFun fun <$ lookup fun primitives
 
 primitives :: [(String, LispFun)]
 primitives = [
@@ -193,17 +202,17 @@ unpackString notString = throwError $ TypeMismatch "string" notString
 
 typeTest :: (LispVal -> Bool) -> LispFun
 typeTest f [v] = return . Bool $ f v
-typeTest _ vs  = throwError $ NumArgs 2 vs
+typeTest _ vs  = throwError $ NumArgs 1 vs
 
 symbolToString :: LispFun
 symbolToString [Atom s] = return $ String s
 symbolToString [v]      = throwError $ TypeMismatch "symbol" v
-symbolToString vs       = throwError $ NumArgs 2 vs
+symbolToString vs       = throwError $ NumArgs 1 vs
 
 stringToSymbol :: LispFun
 stringToSymbol [String s] = return $ Atom s
 stringToSymbol [v]        = throwError $ TypeMismatch "string" v
-stringToSymbol vs         = throwError $ NumArgs 2 vs
+stringToSymbol vs         = throwError $ NumArgs 1 vs
 
 stringAppend :: LispFun
 stringAppend = fmap String . foldrM append "" where
