@@ -2,11 +2,11 @@ module Eval where
 
 import Data
 
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>), (<*>), (<|>))
 import Control.Monad.Error (ErrorT, runErrorT, throwError)
 import Control.Monad.State (State, runState, get, put, gets, modify)
 
-import Data.Traversable    (traverse)
+import Data.Traversable (traverse)
 
 import qualified Data.Map as Map
 
@@ -50,11 +50,7 @@ eval val = case val of
   List [Atom "lambda", List params, body] ->
     return $ Function (map showVal params) Nothing body
 
-  List (Atom fun : args) -> applyPrimitive fun =<< traverse eval args
-
-  List (fun : args) -> do  f  <- eval fun
-                           as <- traverse eval args
-                           applyFun f as
+  List (fun : args) -> applyFun fun =<< traverse eval args
 
   Vector vs -> Vector <$> traverse eval vs
 
@@ -68,10 +64,10 @@ defineVar name value = do
   return value
 
 getVar :: String -> Eval LispVal
-getVar name = do maybeValue <- gets $ Map.lookup name
-                 case maybeValue of
-                   Just v  -> return v
-                   Nothing -> throwError $ UnboundVar name
+getVar name = findVar name >>= maybe (throwError $ UnboundVar name) return
+
+findVar :: String -> Eval (Maybe LispVal)
+findVar name = gets $ Map.lookup name
 
 evalCond :: LispFun
 evalCond [] = return $ Bool False
@@ -92,6 +88,17 @@ evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
     evalClause badClause = throwError $ BadSpecialForm
                              "Invalid case clause" badClause
 
+applyFun :: LispVal -> LispFun
+applyFun fun args = case fun of
+  Atom f -> lookupFun f >>= ($ args)
+  val    -> applyUserFun val args
+
+lookupFun :: String -> Eval LispFun
+lookupFun name = do maybeVal <- findVar name
+                    let maybePrimitive = lookup name primitives
+                        maybeFun = (applyUserFun <$> maybeVal) <|> maybePrimitive
+                    maybe (throwError $ UnboundVar name) return maybeFun
+
 applyPrimitive :: String -> LispFun
 applyPrimitive fun args =
   maybe
@@ -99,8 +106,8 @@ applyPrimitive fun args =
     ($ args)
     (lookup fun primitives)
 
-applyFun :: LispVal -> LispFun
-applyFun fun args = case fun of
+applyUserFun :: LispVal -> LispFun
+applyUserFun fun args = case fun of
   Function params Nothing _ | length params /= length args ->
     throwError $ NumArgs (toInteger $ length params) args
   Function params vararg body -> do
