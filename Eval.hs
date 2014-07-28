@@ -84,7 +84,7 @@ evalCase :: LispVal -> LispFun
 evalCase _   []     = return $ Bool False
 evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
   where
-    evalClause (List [List ds, v]) = return $
+    evalClause (List [List ds, v]) = traverse eval $
       if any (eqvInternal key) ds then Just v else Nothing
     evalClause badClause = throwError $ BadSpecialForm
                              "Invalid case clause" badClause
