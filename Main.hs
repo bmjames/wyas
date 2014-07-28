@@ -7,7 +7,6 @@ import Eval
 import Data (LispVal)
 
 import Control.Monad          (forever, void)
-import Control.Monad.Error    (runErrorT)
 import Control.Monad.State    (StateT, runStateT, get, put)
 import Control.Monad.IO.Class (liftIO)
 

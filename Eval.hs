@@ -133,7 +133,7 @@ primitives = [
   , ("<",  numBoolBinOp (<))
   , (">",  numBoolBinOp (>))
   , ("/=", numBoolBinOp (/=))
-  , (">=", numBoolBinOp (<=))
+  , (">=", numBoolBinOp (>=))
   , ("<=", numBoolBinOp (<=))
 
   , ("&&", boolBoolBinOp (&&))
