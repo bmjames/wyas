@@ -102,7 +102,7 @@ parseVector = Vector . V.fromList <$> vec where
   vec = (string "#(" *> exprs <* char ')') <?> "vector"
 
 exprs :: Parser [LispVal]
-exprs = (parseExpr `endBy` skipSpace) <?> "[expr..]" where
+exprs = skipSpace *> (parseExpr `endBy` skipSpace) <?> "[expr..]" where
   endBy p sep = many (p <* sep)
 
 parseExpr :: Parser LispVal
