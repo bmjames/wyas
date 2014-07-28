@@ -6,6 +6,7 @@ import Control.Applicative ((<$>), (<*>), (<|>))
 import Control.Monad.Error (ErrorT, runErrorT, throwError)
 import Control.Monad.State (State, runState, get, put, gets, modify)
 
+import Data.Foldable    (foldrM)
 import Data.Traversable (traverse)
 
 import qualified Data.Map as Map
@@ -156,6 +157,7 @@ primitives = [
 
   , ("symbol->string", symbolToString)
   , ("string->symbol", stringToSymbol)
+  , ("string-append",  stringAppend)
 
   , ("car",  car)
   , ("cdr",  cdr)
@@ -199,6 +201,11 @@ stringToSymbol :: LispFun
 stringToSymbol [String s] = return $ Atom s
 stringToSymbol [v]        = throwError $ TypeMismatch "string" v
 stringToSymbol vs         = throwError $ NumArgs 2 vs
+
+stringAppend :: LispFun
+stringAppend = fmap String . foldrM append "" where
+  append (String s) acc = return $ s ++ acc
+  append notString  _   = throwError $ TypeMismatch "string" notString
 
 boolBinOp :: (LispVal -> Eval a) -> (a -> a -> Bool) -> LispFun
 boolBinOp f op [a1, a2] = fmap Bool . op <$> f a1 <*> f a2
