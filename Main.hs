@@ -6,7 +6,11 @@ import Parser
 import Eval
 import Data (LispVal)
 
-import Control.Monad (forever)
+import Control.Monad          (forever, void)
+import Control.Monad.Error    (runErrorT)
+import Control.Monad.State    (StateT, runStateT, get, put)
+import Control.Monad.IO.Class (liftIO)
+
 import Data.Monoid   ((<>))
 import Data.Text     (Text, pack)
 import Data.Foldable (traverse_)
@@ -21,20 +25,22 @@ getInput prompt = do
   line <- getLine
   return $ if null line then Nothing else Just $ pack line <> "\n"
 
-handleParseResult :: Result LispVal -> IO ()
+handleParseResult :: Result LispVal -> StateT Env IO ()
 handleParseResult parseResult =
   case parseResult of
     Fail _ msgs parseErr ->
       traverse_ putErrLn (parseErr : msgs)
-    Done _   val -> 
-      let result = runEval nullEnv $ eval val
-      in either (putErrLn . show) print result
+    Done _   val -> do
+      env <- get
+      let (result, newEnv) = runEval env (eval val)
+      put newEnv
+      either (putErrLn . show) (liftIO . print) result
     Partial resume ->
-      getInput "... " >>= traverse_ (handleParseResult . resume)
+      liftIO (getInput "... ") >>= traverse_ (handleParseResult . resume)
 
   where
-    putErrLn msg = putStrLn $ "*** " ++ msg
+    putErrLn msg = liftIO $ putStrLn $ "*** " ++ msg
 
 main :: IO ()
-main = forever $
-  getInput ">>> " >>= traverse_ (handleParseResult . parse parseExpr)
+main = void $ flip runStateT nullEnv $ forever $
+  liftIO (getInput ">>> ") >>= traverse_ (handleParseResult . parse parseExpr)

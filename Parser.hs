@@ -8,7 +8,6 @@ import Control.Applicative
 import Control.Monad.Error (throwError)
 
 import Data.Attoparsec.Text
-import Data.Text        (Text)
 import Data.Char        (digitToInt, toLower, toUpper)
 import Data.Traversable (traverse)
 

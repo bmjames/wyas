@@ -4,7 +4,7 @@ import Data
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Error (ErrorT, runErrorT, throwError)
-import Control.Monad.State (State, evalState, get, put, gets, modify)
+import Control.Monad.State (State, runState, get, put, gets, modify)
 
 import Data.Traversable    (traverse)
 
@@ -19,8 +19,8 @@ type LispFun = [LispVal] -> Eval LispVal
 nullEnv :: Env
 nullEnv = Map.empty
 
-runEval :: Env -> Eval a -> ThrowsError a
-runEval env = flip evalState env . runErrorT
+runEval :: Env -> Eval a -> (ThrowsError a, Env)
+runEval env = flip runState env . runErrorT
 
 type BinOp a = a -> a -> a
 
