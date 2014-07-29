@@ -17,7 +17,7 @@ import qualified Data.Vector as V
 
 
 symbol :: Parser Char
-symbol = satisfy (inClass "!#$%&|*+-/:<=>?@^_~") <?> "symbol"
+symbol = satisfy (inClass "-!#$%&|*+/:<=>?@^_~") <?> "symbol"
 
 parseString :: Parser LispVal
 parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
@@ -66,11 +66,11 @@ parseBin = parseBin' <?> "binary" where
 
 parseOct :: Parser LispVal
 parseOct = fmap Number $ fst . head . readOct <$> many1 octDigit
-  where octDigit = satisfy (inClass ['0'..'7']) <?> "'0'..'7'"
+  where octDigit = satisfy (inClass "0-7") <?> "'0'..'7'"
 
 parseHex :: Parser LispVal
 parseHex = fmap Number $ fst . head . readHex <$> many1 hexDigit
-  where hexDigit = satisfy (inClass $ ['0'..'9'] ++ ['a'..'f']) <?> "'0'..'f'"
+  where hexDigit = satisfy (inClass "0-9a-f") <?> "'0'..'f'"
 
 parseFloat :: Parser LispVal
 parseFloat = Float <$> fst . head . readFloat <$> float' where

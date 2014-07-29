@@ -50,10 +50,14 @@ eval val = case val of
 
   List [Atom "define", Atom name, form] -> eval form >>= defineVar name
   List [Atom "define", List (Atom fun : params), body] ->
-    makeFunc Nothing params body >>= defineVar fun
+    makeFun Nothing params body >>= defineVar fun
+  List [Atom "define", DottedList (Atom fun : params) (Atom varargs), body] ->
+    makeFun (Just varargs) params body >>= defineVar fun
 
   List [Atom "lambda", List params, body] ->
-    makeFunc Nothing params body
+    makeFun Nothing params body
+  List [Atom "lambda", DottedList params (Atom varargs), body] ->
+    makeFun (Just varargs) params body
 
   List (fun : args) -> do f  <- eval fun
                           as <- traverse eval args
@@ -65,8 +69,8 @@ eval val = case val of
 
   badForm -> throwError $ BadSpecialForm "Unrecognized special form" badForm
 
-makeFunc :: Maybe String -> [LispVal] -> LispVal -> Eval LispVal
-makeFunc varargs params body = do
+makeFun :: Maybe String -> [LispVal] -> LispVal -> Eval LispVal
+makeFun varargs params body = do
   env <- get
   return $ Function env (map showVal params) varargs body
 
@@ -121,7 +125,7 @@ applyUserFun fun args = case fun of
     modify (Map.union env)
     traverse_ (uncurry defineVar) (zip params args)
     let varargs = List $ drop (length params) args
-    traverse_ (`defineVar` varargs) vararg
+    traverse_ (`defineVar` traceShow varargs varargs) vararg
     value <- eval body
     put curEnv
     return value
