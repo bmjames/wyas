@@ -49,10 +49,11 @@ eval val = case val of
   List (Atom "case" : key : clauses) -> flip evalCase clauses =<< eval key
 
   List [Atom "define", Atom name, form] -> eval form >>= defineVar name
+  List [Atom "define", List (Atom fun : params), body] ->
+    makeFunc Nothing params body >>= defineVar fun
 
-  List [Atom "lambda", List params, body] -> do
-    env <- get
-    return $ Function env (map showVal params) Nothing body
+  List [Atom "lambda", List params, body] ->
+    makeFunc Nothing params body
 
   List (fun : args) -> do f  <- eval fun
                           as <- traverse eval args
@@ -63,6 +64,11 @@ eval val = case val of
   DottedList v1 v2 -> DottedList <$> traverse eval v1 <*> eval v2
 
   badForm -> throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+makeFunc :: Maybe String -> [LispVal] -> LispVal -> Eval LispVal
+makeFunc varargs params body = do
+  env <- get
+  return $ Function env (map showVal params) varargs body
 
 defineVar :: String -> LispVal -> Eval LispVal
 defineVar name value = do
@@ -96,14 +102,8 @@ evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
 
 applyFun :: LispVal -> LispFun
 applyFun fun args = case fun of
-  PrimFun f -> lookupFun f >>= ($ args)
+  PrimFun f -> applyPrimitive f args
   val       -> applyUserFun val args
-
-lookupFun :: String -> Eval LispFun
-lookupFun name = do maybeVal <- findVar name
-                    let maybePrimitive = lookup name primitives
-                        maybeFun = (applyUserFun <$> maybeVal) <|> maybePrimitive
-                    maybe (throwError $ UnboundVar name) return maybeFun
 
 applyPrimitive :: String -> LispFun
 applyPrimitive fun args =
