@@ -4,7 +4,7 @@ import Data
 
 import Prelude hiding (null)
 
-import Control.Applicative ((<$>), (<*>), (<|>))
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad.Error (ErrorT, runErrorT, throwError)
 import Control.Monad.State (State, runState, get, put, gets, modify)
 
@@ -118,7 +118,7 @@ applyUserFun fun args = case fun of
     throwError $ NumArgs (toInteger $ length params) args
   Function env params vararg body -> do
     curEnv <- get
-    put env
+    modify (Map.union env)
     traverse_ (uncurry defineVar) (zip params args)
     let varargs = List $ drop (length params) args
     traverse_ (`defineVar` varargs) vararg

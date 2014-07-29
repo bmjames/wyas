@@ -78,7 +78,7 @@ showVal val = case val of
   Function _ params vararg  _ ->
     "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
 
-  PrimFun fun     -> fun
+  PrimFun _     -> "<primitive fun>"
 
   where
     unwordsVal = unwords . map showVal
