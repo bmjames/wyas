@@ -16,6 +16,8 @@ import Data.Functor.Identity (Identity)
 import Data.Foldable    (foldrM, traverse_)
 import Data.Traversable (traverse)
 
+import System.IO (IOMode(ReadMode, WriteMode), openFile)
+
 import qualified Data.Map                  as Map
 import qualified Data.Vector               as Vector
 
@@ -42,6 +44,7 @@ eval val = case val of
   Bool _      -> return val
   Character _ -> return val
   PrimFun _   -> return val
+  IOFun _     -> return val
   Port _      -> return val
 
   Atom ident  -> hoistEval $ getVar ident
@@ -116,6 +119,7 @@ evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
 applyFun :: LispVal -> [LispVal] -> EvalIO LispVal
 applyFun fun args = case fun of
   PrimFun f -> hoistEval $ lift $ f args
+  IOFun f   -> lift $ f args
   val       -> applyUserFun val args
 
 applyUserFun :: LispVal -> [LispVal] -> EvalIO LispVal
@@ -134,7 +138,17 @@ applyUserFun fun args = case fun of
   notFun -> error $ NotFunction "Not a function" notFun
 
 primitiveBindings :: Env
-primitiveBindings = fmap PrimFun primitives
+primitiveBindings = Map.union (fmap PrimFun primitives) (fmap IOFun ioPrimitives)
+
+ioPrimitives :: Map.Map String IOFun
+ioPrimitives = Map.fromList [
+    ("open-input-file", makePort ReadMode)
+  ]
+
+makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
+makePort mode [String filename] = fmap Port $ lift $ openFile filename mode
+makePort _    [badArg]          = throwError $ TypeMismatch "string" badArg
+makePort _    badArgs           = throwError $ NumArgs 1 badArgs
 
 primitives :: Map.Map String LispFun
 primitives = Map.fromList [

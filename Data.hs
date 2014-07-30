@@ -11,8 +11,10 @@ import System.IO (Handle)
 import qualified Data.Vector as V
 
 type ThrowsError = ErrorT LispError Identity
+type IOThrowsError = ErrorT LispError IO
 
 type LispFun = [LispVal] -> ThrowsError LispVal
+type IOFun = [LispVal] -> IOThrowsError LispVal
 
 type Env = Map String LispVal
 
@@ -27,6 +29,7 @@ data LispVal = Atom       String
              | Character  Char
              | Function   Env [String] (Maybe String) LispVal
              | PrimFun    LispFun
+             | IOFun      IOFun
              | Port       Handle
 
 isString :: LispVal -> Bool
@@ -85,7 +88,8 @@ showVal val = case val of
   Function _ params vararg  _ ->
     "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
 
-  PrimFun _     -> "<primitive fun>"
+  PrimFun _     -> "<primitive>"
+  IOFun   _     -> "<i/o primitive>"
   Port    _     -> "<i/o port>"
 
   where
