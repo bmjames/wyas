@@ -6,9 +6,9 @@ import Parser
 import Eval (nullEnv, eval, runEval)
 import Data (Env, LispVal)
 
-import Control.Monad          (forever, void)
-import Control.Monad.State    (StateT, runStateT, get, put)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad             (forever, void)
+import Control.Monad.Trans.State (StateT, runStateT, get, put)
+import Control.Monad.IO.Class    (liftIO)
 
 import Data.Monoid   ((<>))
 import Data.Text     (Text, pack)
@@ -31,9 +31,10 @@ handleParseResult parseResult =
       traverse_ putErrLn (parseErr : msgs)
     Done _   val -> do
       env <- get
-      let (result, newEnv) = runEval env (eval val)
-      put newEnv
-      either (putErrLn . show) (liftIO . print) result
+      result <- liftIO $ runEval env (eval val)
+      case result of
+        Left err  -> putErrLn $ show err
+        Right (output, newEnv) -> liftIO (print output) >> put newEnv
     Partial resume ->
       liftIO (getInput "... ") >>= traverse_ (handleParseResult . resume)
 

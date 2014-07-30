@@ -1,11 +1,15 @@
 module Data where
 
-import Control.Monad.Error (Error(..), catchError)
+import Control.Monad.Trans.Error (Error(..))
 
 import Data.Foldable (foldMap)
 import Data.Map      (Map)
 
+import System.IO (Handle)
+
 import qualified Data.Vector as V
+
+type ThrowsError = Either LispError
 
 type Env = Map String LispVal
 
@@ -20,6 +24,7 @@ data LispVal = Atom       String
              | Character  Char
              | Function   Env [String] (Maybe String) LispVal
              | PrimFun    String
+             | Port       Handle
              deriving Eq
 
 isString :: LispVal -> Bool
@@ -79,6 +84,7 @@ showVal val = case val of
     "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
 
   PrimFun _     -> "<primitive fun>"
+  Port    _     -> "<i/o port>"
 
   where
     unwordsVal = unwords . map showVal
@@ -99,5 +105,4 @@ instance Error LispError where
   noMsg = Default "An error has occurred"
   strMsg = Default
 
-type ThrowsError = Either LispError
 

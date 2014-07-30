@@ -4,29 +4,43 @@ import Data
 
 import Prelude hiding (null)
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Monad.Error (ErrorT, runErrorT, throwError)
-import Control.Monad.State (State, runState, get, put, gets, modify)
+import Control.Applicative    ((<$>), (<*>))
+
+import Control.Monad.Trans.State  (StateT, runStateT, get, gets, put, modify)
+import Control.Monad.Trans.Error  (ErrorT, runErrorT)
+import Control.Monad.Trans.Class  (lift)
+
+import Control.Monad.Morph   (hoist, generalize)
+import Data.Functor.Identity (Identity, runIdentity)
 
 import Data.Functor     ((<$))
 import Data.Foldable    (foldrM, traverse_)
 import Data.Traversable (traverse)
 
-import qualified Data.Map as Map
-
-type Eval = ErrorT LispError (State Env)
+import qualified Data.Map                  as Map
+import qualified Control.Monad.Trans.Error as CMTE
 
 type LispFun = [LispVal] -> Eval LispVal
+
+type EvalT f a = StateT Env (ErrorT LispError f) a
+type EvalIO a = EvalT IO a
+type Eval a = EvalT Identity a
+
+throwError :: Monad f => LispError -> EvalT f a
+throwError = lift . CMTE.throwError
+
+hoistEval :: Monad f => Eval a -> EvalT f a
+hoistEval = hoist (hoist generalize)
 
 nullEnv :: Env
 nullEnv = Map.empty
 
-runEval :: Env -> Eval a -> (ThrowsError a, Env)
-runEval env = flip runState env . runErrorT
+runEval :: Monad f => Env -> EvalT f a -> f (ThrowsError (a, Env))
+runEval env fa = runErrorT $ runStateT fa env
 
 type BinOp a = a -> a -> a
 
-eval :: LispVal -> Eval LispVal
+eval :: LispVal -> EvalIO LispVal
 eval val = case val of
   String _    -> return val
   Number _    -> return val
@@ -34,8 +48,9 @@ eval val = case val of
   Bool _      -> return val
   Character _ -> return val
   PrimFun _   -> return val
+  Port _      -> return val
 
-  Atom ident  -> maybe (getVar ident) return (lookupPrimitive ident)
+  Atom ident  -> maybe (hoistEval $ getVar ident) return (lookupPrimitive ident)
 
   List [Atom "quote", v] -> return v
 
@@ -48,16 +63,16 @@ eval val = case val of
 
   List (Atom "case" : key : clauses) -> flip evalCase clauses =<< eval key
 
-  List [Atom "define", Atom name, form] -> eval form >>= defineVar name
+  List [Atom "define", Atom name, form] -> eval form >>= hoistEval . defineVar name
   List [Atom "define", List (Atom fun : params), body] ->
-    makeFun Nothing params body >>= defineVar fun
+    hoistEval $ makeFun Nothing params body >>= defineVar fun
   List [Atom "define", DottedList (Atom fun : params) (Atom varargs), body] ->
-    makeFun (Just varargs) params body >>= defineVar fun
+    hoistEval $ makeFun (Just varargs) params body >>= defineVar fun
 
   List [Atom "lambda", List params, body] ->
-    makeFun Nothing params body
+    hoistEval $ makeFun Nothing params body
   List [Atom "lambda", DottedList params (Atom varargs), body] ->
-    makeFun (Just varargs) params body
+    hoistEval $ makeFun (Just varargs) params body
 
   List (fun : args) -> do f  <- eval fun
                           as <- traverse eval args
@@ -85,17 +100,17 @@ getVar name = findVar name >>= maybe (throwError $ UnboundVar name) return
 findVar :: String -> Eval (Maybe LispVal)
 findVar name = gets $ Map.lookup name
 
-evalCond :: LispFun
+evalCond :: [LispVal] -> EvalIO LispVal
 evalCond [] = return $ Bool False
 evalCond [List [Atom "else", v]] = eval v
 evalCond (c:cs) = maybe (evalCond cs) return =<< evalClause =<< eval c
   where
-    evalClause (List [p, v]) = do b <- unpackBool =<< eval p
+    evalClause (List [p, v]) = do b <- hoistEval . unpackBool =<< eval p
                                   if b then Just <$> eval v else return Nothing
     evalClause badClause = throwError $ BadSpecialForm
                              "Invalid conditional clause" badClause
 
-evalCase :: LispVal -> LispFun
+evalCase :: LispVal -> [LispVal] -> EvalIO LispVal
 evalCase _   []     = return $ Bool False
 evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
   where
@@ -104,9 +119,9 @@ evalCase key (c:cs) = maybe (evalCase key cs) return =<< evalClause c
     evalClause badClause = throwError $ BadSpecialForm
                              "Invalid case clause" badClause
 
-applyFun :: LispVal -> LispFun
+applyFun :: LispVal -> [LispVal] -> EvalIO LispVal
 applyFun fun args = case fun of
-  PrimFun f -> applyPrimitive f args
+  PrimFun f -> hoistEval $ applyPrimitive f args
   val       -> applyUserFun val args
 
 applyPrimitive :: String -> LispFun
@@ -116,16 +131,16 @@ applyPrimitive fun args =
     ($ args)
     (lookup fun primitives)
 
-applyUserFun :: LispVal -> LispFun
+applyUserFun :: LispVal -> [LispVal] -> EvalIO LispVal
 applyUserFun fun args = case fun of
   Function _ params Nothing _ | length params /= length args ->
     throwError $ NumArgs (toInteger $ length params) args
   Function env params vararg body -> do
     curEnv <- get
     modify (Map.union env)
-    traverse_ (uncurry defineVar) (zip params args)
+    traverse_ (hoistEval . uncurry defineVar) (zip params args)
     let varargs = List $ drop (length params) args
-    traverse_ (`defineVar` traceShow varargs varargs) vararg
+    traverse_ (hoistEval . flip defineVar varargs) vararg
     value <- eval body
     put curEnv
     return value

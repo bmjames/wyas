@@ -5,7 +5,7 @@ module Parser where
 import Data
 
 import Control.Applicative
-import Control.Monad.Error (throwError)
+import Control.Monad.Trans.Error (throwError)
 
 import Data.Attoparsec.Text
 import Data.Char        (digitToInt, toLower, toUpper)
