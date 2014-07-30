@@ -1,15 +1,18 @@
 module Data where
 
-import Control.Monad.Trans.Error (Error(..))
+import Control.Monad.Trans.Error (Error(..), ErrorT)
 
-import Data.Foldable (foldMap)
-import Data.Map      (Map)
+import Data.Functor.Identity (Identity)
+import Data.Foldable         (foldMap)
+import Data.Map              (Map)
 
 import System.IO (Handle)
 
 import qualified Data.Vector as V
 
-type ThrowsError = Either LispError
+type ThrowsError = ErrorT LispError Identity
+
+type LispFun = [LispVal] -> ThrowsError LispVal
 
 type Env = Map String LispVal
 
@@ -23,9 +26,8 @@ data LispVal = Atom       String
              | Bool       Bool
              | Character  Char
              | Function   Env [String] (Maybe String) LispVal
-             | PrimFun    String
+             | PrimFun    LispFun
              | Port       Handle
-             deriving Eq
 
 isString :: LispVal -> Bool
 isString (String _) = True
@@ -104,5 +106,3 @@ data LispError = NumArgs Integer [LispVal]
 instance Error LispError where
   noMsg = Default "An error has occurred"
   strMsg = Default
-
-

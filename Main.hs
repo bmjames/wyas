@@ -3,7 +3,7 @@
 module Main where
 
 import Parser
-import Eval (nullEnv, eval, runEval)
+import Eval (eval, runEval, primitiveBindings)
 import Data (Env, LispVal)
 
 import Control.Monad             (forever, void)
@@ -42,5 +42,5 @@ handleParseResult parseResult =
     putErrLn msg = liftIO $ putStrLn $ "*** " ++ msg
 
 main :: IO ()
-main = void $ flip runStateT nullEnv $ forever $
+main = void $ flip runStateT primitiveBindings $ forever $
   liftIO (getInput ">>> ") >>= traverse_ (handleParseResult . parse parseExpr)
