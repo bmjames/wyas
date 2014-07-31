@@ -102,8 +102,10 @@ parseVector = Vector . V.fromList <$> vec where
   vec = (string "#(" *> exprs <* char ')') <?> "vector"
 
 exprs :: Parser [LispVal]
-exprs = skipSpace *> (parseExpr `endBy` skipSpace) <?> "[expr..]" where
-  endBy p sep = many (p <* sep)
+exprs = skipSpace *> (parseExpr `endBy` skipSpace) <?> "[expr..]"
+
+endBy :: Parser a -> Parser b -> Parser [a]
+endBy p sep = many (p <* sep)
 
 parseExpr :: Parser LispVal
 parseExpr =
@@ -115,5 +117,11 @@ parseExpr =
   <|> parseQuoted
   <|> parseListOrPairs
 
+readOrThrow :: Parser a -> Text -> ThrowsError a
+readOrThrow parser = either (throwError . Parser) return . parseOnly parser
+
 readExpr :: Text -> ThrowsError LispVal
-readExpr t = either (throwError . Parser) return $ parseOnly parseExpr t
+readExpr = readOrThrow parseExpr
+
+readExprList :: Text -> ThrowsError [LispVal]
+readExprList = readOrThrow (parseExpr `endBy` skipSpace)

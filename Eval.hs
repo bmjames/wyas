@@ -1,7 +1,7 @@
 module Eval where
 
 import Data
-import Parser (readExpr)
+import Parser (readExpr, readExprList)
 
 import Prelude hiding (null, error)
 
@@ -15,6 +15,7 @@ import Control.Monad.IO.Class     (liftIO)
 import Control.Monad.Morph   (hoist, generalize)
 import Data.Functor          ((<$))
 import Data.Functor.Identity (Identity)
+import Data.Maybe            (listToMaybe, fromMaybe)
 
 import Data.Foldable    (foldrM, traverse_)
 import Data.Traversable (traverse)
@@ -74,6 +75,9 @@ eval val = case val of
     hoistEval $ makeFun Nothing params body
   List [Atom "lambda", DottedList params (Atom varargs), body] ->
     hoistEval $ makeFun (Just varargs) params body
+
+  List [Atom "load", String filename] ->
+    lift (load filename) >>= traverse eval >>= return . fromMaybe (List []) . listToMaybe
 
   List (fun : args) -> do f  <- eval fun
                           as <- traverse eval args
@@ -151,6 +155,9 @@ ioPrimitives = Map.fromList [
   , ("close-input-port", closePort)
   , ("close-output-port", closePort)
   , ("read", readProc)
+  , ("write", writeProc)
+  , ("read-contents", readContents)
+  , ("read-all", readAll)
   ]
 
 makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
@@ -167,6 +174,24 @@ readProc []          = readProc [Port stdin]
 readProc [Port port] = liftIO (Text.hGetLine port) >>= liftThrows . readExpr
 readProc [badArg]    = throwError $ TypeMismatch "string" badArg
 readProc badArgs     = throwError $ NumArgs 1 badArgs
+
+writeProc :: [LispVal] -> IOThrowsError LispVal
+writeProc [obj]            = writeProc [obj, Port stdout]
+writeProc [obj, Port port] = liftIO $ Bool True <$ hPrint port obj
+writeProc _                = return $ Bool False
+
+readContents :: [LispVal] -> IOThrowsError LispVal
+readContents [String filename] = fmap String $ liftIO $ readFile filename
+readContents [badArg]          = throwError $ TypeMismatch "string" badArg
+readContents badArgs           = throwError $ NumArgs 1 badArgs
+
+load :: String -> IOThrowsError [LispVal]
+load filename = liftIO (Text.readFile filename) >>= liftThrows . readExprList
+
+readAll :: [LispVal] -> IOThrowsError LispVal
+readAll [String filename] = fmap List $ load filename
+readAll [badArg]          = throwError $ TypeMismatch "string" badArg
+readAll badArgs           = throwError $ NumArgs 1 badArgs
 
 primitives :: Map.Map String LispFun
 primitives = Map.fromList [
