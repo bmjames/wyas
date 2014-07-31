@@ -1,6 +1,7 @@
 module Data where
 
-import Control.Monad.Trans.Error (Error(..), ErrorT)
+import Control.Monad.Trans.Error (Error(..), ErrorT, throwError)
+import Control.Monad.Morph       (hoist, generalize)
 
 import Data.Functor.Identity (Identity)
 import Data.Foldable         (foldMap)
@@ -106,6 +107,9 @@ data LispError = NumArgs Integer [LispVal]
                | UnboundVar String
                | Default String
                deriving Show
+
+liftThrows :: ThrowsError a -> IOThrowsError a
+liftThrows = hoist generalize
 
 instance Error LispError where
   noMsg = Default "An error has occurred"

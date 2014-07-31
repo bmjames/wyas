@@ -1,6 +1,7 @@
 module Eval where
 
 import Data
+import Parser (readExpr)
 
 import Prelude hiding (null, error)
 
@@ -9,17 +10,20 @@ import Control.Applicative    ((<$>), (<*>))
 import Control.Monad.Trans.State  (StateT, runStateT, get, gets, put, modify)
 import Control.Monad.Trans.Error  (ErrorT, runErrorT, throwError)
 import Control.Monad.Trans.Class  (lift)
+import Control.Monad.IO.Class     (liftIO)
 
 import Control.Monad.Morph   (hoist, generalize)
+import Data.Functor          ((<$))
 import Data.Functor.Identity (Identity)
 
 import Data.Foldable    (foldrM, traverse_)
 import Data.Traversable (traverse)
 
-import System.IO (IOMode(ReadMode, WriteMode), openFile)
+import System.IO
 
-import qualified Data.Map                  as Map
-import qualified Data.Vector               as Vector
+import qualified Data.Map     as Map
+import qualified Data.Text.IO as Text
+import qualified Data.Vector  as Vector
 
 type EvalT f a = StateT Env (ErrorT LispError f) a
 type EvalIO a = EvalT IO a
@@ -143,12 +147,26 @@ primitiveBindings = Map.union (fmap PrimFun primitives) (fmap IOFun ioPrimitives
 ioPrimitives :: Map.Map String IOFun
 ioPrimitives = Map.fromList [
     ("open-input-file", makePort ReadMode)
+  , ("open-output-file", makePort WriteMode)
+  , ("close-input-port", closePort)
+  , ("close-output-port", closePort)
+  , ("read", readProc)
   ]
 
 makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
-makePort mode [String filename] = fmap Port $ lift $ openFile filename mode
+makePort mode [String filename] = fmap Port $ liftIO $ openFile filename mode
 makePort _    [badArg]          = throwError $ TypeMismatch "string" badArg
 makePort _    badArgs           = throwError $ NumArgs 1 badArgs
+
+closePort :: [LispVal] -> IOThrowsError LispVal
+closePort [Port port] = liftIO $ Bool True <$ hClose port
+closePort _           = return $ Bool False
+
+readProc :: [LispVal] -> IOThrowsError LispVal
+readProc []          = readProc [Port stdin]
+readProc [Port port] = liftIO (Text.hGetLine port) >>= liftThrows . readExpr
+readProc [badArg]    = throwError $ TypeMismatch "string" badArg
+readProc badArgs     = throwError $ NumArgs 1 badArgs
 
 primitives :: Map.Map String LispFun
 primitives = Map.fromList [

@@ -29,7 +29,7 @@ handleParseResult parseResult =
   case parseResult of
     Fail _ msgs parseErr ->
       traverse_ putErrLn (parseErr : msgs)
-    Done _   val -> do
+    Done _ val -> do
       env <- get
       result <- liftIO $ runEval env (eval val)
       case result of

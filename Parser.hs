@@ -10,6 +10,7 @@ import Control.Monad.Trans.Error (throwError)
 import Data.Attoparsec.Text
 import Data.Char        (digitToInt, toLower, toUpper)
 import Data.Traversable (traverse)
+import Data.Text        (Text)
 
 import Numeric          (readOct, readHex, readInt, readFloat)
 
@@ -113,3 +114,6 @@ parseExpr =
   <|> parseString
   <|> parseQuoted
   <|> parseListOrPairs
+
+readExpr :: Text -> ThrowsError LispVal
+readExpr t = either (throwError . Parser) return $ parseOnly parseExpr t
