@@ -2,6 +2,8 @@
 
 module Parser where
 
+import Prelude hiding (takeWhile)
+
 import Data
 
 import Control.Applicative
@@ -23,7 +25,7 @@ symbol = satisfy (inClass "-!#$%&|*+/:<=>?@^_~") <?> "symbol"
 parseString :: Parser LispVal
 parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
   where
-    char' = try (char '\\' *> escapedChar) <|> notChar '"'
+    char' = (char '\\' *> escapedChar) <|> notChar '"'
     escapedChar =     ('"'  <$ char '"')
                   <|> ('\n' <$ char 'n')
                   <|> ('\r' <$ char 'r')
@@ -33,7 +35,7 @@ parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
 parseChar :: Parser LispVal
 parseChar = Character <$> char' <?> "character"
   where
-    char'     = string "#\\" *> (try namedChar <|> anyChar <|> pure ' ')
+    char'     = string "#\\" *> (namedChar <|> anyChar <|> pure ' ')
     namedChar =     (' '  <$ iString "space")
                 <|> ('\n' <$ iString "newline")
                 <|> ('\t' <$ iString "tab")
@@ -88,40 +90,45 @@ parseQuoted = do
 
 parseListOrPairs :: Parser LispVal
 parseListOrPairs = do
-  char '('
+  char '(' *> skipSpaceAndComment
   es  <- exprs
   val <- (dottedList es <?> "dotted list") <|> pure (List es)
-  char ')'
+  skipSpaceAndComment *> char ')'
   return val
 
   where
-    dottedList es = DottedList es <$> (char '.' *> skipSpace *> parseExpr)
+    dottedList es = DottedList es <$> (char '.' *> skipSpaceAndComment *> parseExpr)
 
 parseVector :: Parser LispVal
 parseVector = Vector . V.fromList <$> vec where
   vec = (string "#(" *> exprs <* char ')') <?> "vector"
 
 exprs :: Parser [LispVal]
-exprs = skipSpace *> (parseExpr `endBy` skipSpace) <?> "[expr..]"
+exprs = parseExpr `sepBy` skipSpaceAndComment <?> "[expr..]"
 
 endBy :: Parser a -> Parser b -> Parser [a]
 endBy p sep = many (p <* sep)
 
+skipComment :: Parser ()
+skipComment = string ";;" *> takeWhile (/= '\n') *> pure ()
+
+skipSpaceAndComment :: Parser ()
+skipSpaceAndComment = skipSpace *> option () (skipComment *> skipSpaceAndComment)
+
 parseExpr :: Parser LispVal
-parseExpr =
-      try parseNumber
-  <|> try parseChar
-  <|> try parseVector
-  <|> parseAtom
-  <|> parseString
-  <|> parseQuoted
-  <|> parseListOrPairs
+parseExpr = parseNumber
+            <|> parseChar
+            <|> parseVector
+            <|> parseAtom
+            <|> parseString
+            <|> parseQuoted
+            <|> parseListOrPairs
 
 readOrThrow :: Parser a -> Text -> ThrowsError a
 readOrThrow parser = either (throwError . Parser) return . parseOnly parser
 
 readExpr :: Text -> ThrowsError LispVal
-readExpr = readOrThrow parseExpr
+readExpr = readOrThrow (skipSpaceAndComment *> parseExpr)
 
 readExprList :: Text -> ThrowsError [LispVal]
-readExprList = readOrThrow (parseExpr `endBy` skipSpace)
+readExprList = readOrThrow (skipSpaceAndComment *> sepBy parseExpr skipSpaceAndComment)

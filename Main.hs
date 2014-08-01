@@ -43,4 +43,5 @@ handleParseResult parseResult =
 
 main :: IO ()
 main = void $ flip runStateT primitiveBindings $ forever $
-  liftIO (getInput ">>> ") >>= traverse_ (handleParseResult . parse parseExpr)
+  liftIO (getInput ">>> ") >>=
+    traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
