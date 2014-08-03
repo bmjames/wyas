@@ -1,4 +1,4 @@
-module Data where
+module WYAS.Data where
 
 import Control.Monad.Trans.Error (Error(..), ErrorT, throwError)
 import Control.Monad.Morph       (hoist, generalize)

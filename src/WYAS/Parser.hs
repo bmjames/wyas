@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser where
+module WYAS.Parser where
 
 import Prelude hiding (takeWhile)
 
-import Data
+import WYAS.Data
 
 import Control.Applicative
 import Control.Monad.Trans.Error (throwError)

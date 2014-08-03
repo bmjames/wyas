@@ -1,7 +1,7 @@
-module Eval where
+module WYAS.Eval where
 
-import Data
-import Parser (readExpr, readExprList)
+import WYAS.Data
+import WYAS.Parser (readExpr, readExprList)
 
 import Prelude hiding (null, error)
 

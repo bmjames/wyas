@@ -2,9 +2,9 @@
 
 module Main where
 
-import Parser
-import Eval (eval, runEval, primitiveBindings)
-import Data (Env, LispVal)
+import WYAS.Parser
+import WYAS.Eval (eval, runEval, primitiveBindings)
+import WYAS.Data (Env, LispVal)
 
 import Control.Monad             (forever, void)
 import Control.Monad.Trans.State (StateT, runStateT, get, put)
