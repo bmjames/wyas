@@ -125,7 +125,8 @@ parseExpr = parseNumber
             <|> parseListOrPairs
 
 readOrThrow :: Parser a -> Text -> ThrowsError a
-readOrThrow parser = either (throwError . Parser) return . parseOnly parser
+readOrThrow parser =
+  either (throwError . Parser) return . parseOnly parser
 
 readExpr :: Text -> ThrowsError LispVal
 readExpr = readOrThrow (skipSpaceAndComment *> parseExpr)

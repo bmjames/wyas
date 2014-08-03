@@ -15,9 +15,8 @@ import Control.Monad.IO.Class     (liftIO)
 import Control.Monad.Morph   (hoist, generalize)
 import Data.Functor          ((<$))
 import Data.Functor.Identity (Identity)
-import Data.Maybe            (listToMaybe, fromMaybe)
 
-import Data.Foldable    (foldrM, traverse_)
+import Data.Foldable    (foldrM, foldlM, traverse_)
 import Data.Traversable (traverse)
 
 import System.IO
@@ -77,7 +76,7 @@ eval val = case val of
     hoistEval $ makeFun (Just varargs) params body
 
   List [Atom "load", String filename] ->
-    lift (load filename) >>= traverse eval >>= return . fromMaybe (List []) . listToMaybe
+    lift (load filename) >>= evalExprList
 
   List (fun : args) -> do f  <- eval fun
                           as <- traverse eval args
@@ -88,6 +87,9 @@ eval val = case val of
   DottedList v1 v2 -> DottedList <$> traverse eval v1 <*> eval v2
 
   badForm -> error $ BadSpecialForm "Unrecognized special form" badForm
+
+evalExprList :: [LispVal] -> EvalIO LispVal
+evalExprList = foldlM (\_ expr -> eval expr) (List [])
 
 makeFun :: Maybe String -> [LispVal] -> LispVal -> Eval LispVal
 makeFun varargs params body = do
