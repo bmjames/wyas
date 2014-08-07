@@ -14,7 +14,9 @@ import Control.Monad.Trans.Error (runErrorT)
 
 import Data.Text     (Text, pack)
 import Data.Foldable (traverse_)
-import System.IO     (hFlush, hPrint, stdout, stderr)
+
+import System.Console.Haskeline
+import System.IO (hPrint, stderr)
 
 import Options.Applicative hiding (handleParseResult)
 import qualified Options.Applicative as Optparse
@@ -32,14 +34,7 @@ opts =
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
-getInput :: String -> IO (Maybe Text)
-getInput prompt = do
-  putStr prompt
-  hFlush stdout
-  line <- getLine
-  return $ if null line then Nothing else Just $ pack line <> "\n"
-
-handleParseResult :: Result LispVal -> StateT Env IO ()
+handleParseResult :: Result LispVal -> StateT Env (InputT IO) ()
 handleParseResult parseResult =
   case parseResult of
     Fail _ msgs parseErr ->
@@ -49,16 +44,19 @@ handleParseResult parseResult =
       result <- liftIO $ runEval env (eval val)
       case result of
         Left err  -> putErrLn $ show err
-        Right (output, newEnv) -> liftIO (print output) >> put newEnv
+        Right (output, newEnv) -> lift (outputStrLn (show output)) >> put newEnv
     Partial resume ->
-      liftIO (getInput "... ") >>= traverse_ (handleParseResult . resume)
+      lift (getInput "... ") >>= traverse_ (handleParseResult . resume)
 
   where
-    putErrLn msg = liftIO $ putStrLn $ "*** " ++ msg
+    putErrLn msg = lift $ outputStrLn $ "*** " ++ msg
 
-repl :: IO ()
+getInput :: MonadException f => String -> InputT f (Maybe Text)
+getInput = fmap (fmap $ pack . (++ "\n")) . getInputLine
+
+repl :: InputT IO ()
 repl = void $ flip runStateT primitiveBindings $ forever $
-  liftIO (getInput ">>> ") >>=
+  lift (getInput ">>> ") >>=
     traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
 
 evalExpr :: Text -> IO ()
@@ -80,4 +78,4 @@ main = do
   case opts of
     Eval expr -> evalExpr $ pack expr
     RunFile f -> runFile f
-    REPL      -> repl
+    REPL      -> runInputT defaultSettings repl
