@@ -50,6 +50,7 @@ eval val = case val of
   PrimFun _   -> return val
   IOFun _     -> return val
   Port _      -> return val
+  Function _ _ _ _ -> return val
 
   Atom ident  -> hoistEval $ getVar ident
 
@@ -75,6 +76,8 @@ eval val = case val of
   List [Atom "lambda", DottedList params (Atom varargs), body] ->
     hoistEval $ makeFun (Just varargs) params body
 
+  List [Atom "let", List defns, body] -> eval =<< hoistEval (letToLambda defns body)
+
   List [Atom "load", String filename] ->
     lift (load filename) >>= evalExprList
 
@@ -87,6 +90,12 @@ eval val = case val of
   DottedList v1 v2 -> DottedList <$> traverse eval v1 <*> eval v2
 
   badForm -> error $ BadSpecialForm "Unrecognized special form" badForm
+
+letToLambda :: [LispVal] -> LispVal -> Eval LispVal
+letToLambda defns body = case defns of
+  [] -> return body
+  List [ident, value] : ds -> List <$> sequence [makeFun Nothing [ident] =<< letToLambda ds body, return value]
+  badForm : _ -> error $ BadSpecialForm "Bad let binding" badForm
 
 evalExprList :: [LispVal] -> EvalIO LispVal
 evalExprList = foldlM (\_ expr -> eval expr) (List [])

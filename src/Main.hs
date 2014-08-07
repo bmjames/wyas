@@ -16,7 +16,7 @@ import Data.Text     (Text, pack)
 import Data.Foldable (traverse_)
 import System.IO     (hFlush, hPrint, stdout, stderr)
 
-import Options.Applicative
+import Options.Applicative hiding (handleParseResult)
 import qualified Options.Applicative as Optparse
 
 import Data.Attoparsec.Text
