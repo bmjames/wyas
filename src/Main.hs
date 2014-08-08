@@ -7,10 +7,10 @@ import WYAS.Eval hiding (null)
 import WYAS.Data (Env, LispVal, liftThrows)
 
 import Control.Monad             (forever, void)
-import Control.Monad.Trans.State (StateT, runStateT, get, put)
 import Control.Monad.IO.Class    (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Error (runErrorT)
+import Control.Monad.Trans.State.Strict (StateT, runStateT, get, put)
 
 import Data.Text     (Text, pack)
 import Data.Foldable (traverse_)
@@ -34,30 +34,32 @@ opts =
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
-handleParseResult :: Result LispVal -> StateT Env (InputT IO) ()
+handleParseResult :: Result LispVal -> InputT (StateT Env IO) ()
 handleParseResult parseResult =
   case parseResult of
     Fail _ msgs parseErr ->
       traverse_ putErrLn (parseErr : msgs)
     Done _ val -> do
-      env <- get
+      env <- lift get
       result <- liftIO $ runEval env (eval val)
       case result of
         Left err  -> putErrLn $ show err
-        Right (output, newEnv) -> lift (outputStrLn (show output)) >> put newEnv
+        Right (output, newEnv) -> outputStrLn (show output) >> lift (put newEnv)
     Partial resume ->
-      lift (getInput "... ") >>= traverse_ (handleParseResult . resume)
+      getInput "... " >>= traverse_ (handleParseResult . resume)
 
   where
-    putErrLn msg = lift $ outputStrLn $ "*** " ++ msg
+    putErrLn msg = outputStrLn $ "*** " ++ msg
 
 getInput :: MonadException f => String -> InputT f (Maybe Text)
 getInput = fmap (fmap $ pack . (++ "\n")) . getInputLine
 
-repl :: InputT IO ()
-repl = void $ flip runStateT primitiveBindings $ forever $
-  lift (getInput ">>> ") >>=
-    traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
+repl :: IO ()
+repl =
+  void $ flip runStateT primitiveBindings $
+  runInputT defaultSettings $ forever $
+    getInput ">>> " >>=
+      traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
 
 evalExpr :: Text -> IO ()
 evalExpr expr =
@@ -78,4 +80,4 @@ main = do
   case opts of
     Eval expr -> evalExpr $ pack expr
     RunFile f -> runFile f
-    REPL      -> runInputT defaultSettings repl
+    REPL      -> repl
