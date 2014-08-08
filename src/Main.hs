@@ -67,9 +67,13 @@ repl =
   where
     settings = setComplete completeIdents defaultSettings
 
-    completeIdents = completeWord Nothing " \n\t" matchPrefix
+    completeIdents = completeWord Nothing " \n\t()'" matchPrefix
 
-    matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . Map.keys <$> get
+    matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . idents <$> get
+
+    idents env = builtins ++ Map.keys env
+
+    builtins = ["case", "cond", "define", "lambda", "let", "load", "quote"]
 
 evalExpr :: Text -> IO ()
 evalExpr expr =
