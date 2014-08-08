@@ -65,7 +65,7 @@ repl =
       traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
 
   where
-    settings = setComplete completeIdents defaultSettings
+    settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
 
     completeIdents = completeWord Nothing " \n\t()'" matchPrefix
 
@@ -74,6 +74,8 @@ repl =
     idents env = builtins ++ Map.keys env
 
     builtins = ["case", "cond", "define", "lambda", "let", "load", "quote"]
+
+    addFilenameCompletion = completeQuotedWord Nothing "\"" listFiles
 
 evalExpr :: Text -> IO ()
 evalExpr expr =
