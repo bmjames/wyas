@@ -26,14 +26,14 @@ import qualified Options.Applicative as Optparse
 
 import Data.Attoparsec.Text
 
-data Opts = Eval    String
-          | RunFile String
+data Opts = Eval    Text
+          | RunFile FilePath
           | REPL
           deriving (Eq, Show)
 
 opts :: Optparse.Parser Opts
 opts =
-  (Eval <$> strOption (short 'e' <> metavar "EXPRESSION"))
+  (Eval . pack <$> strOption (short 'e' <> metavar "EXPRESSION"))
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
@@ -94,6 +94,6 @@ main :: IO ()
 main = do
   opts <- execParser $ info (helper <*> opts) fullDesc
   case opts of
-    Eval expr -> evalExpr $ pack expr
+    Eval expr -> evalExpr expr
     RunFile f -> runFile f
     REPL      -> repl
