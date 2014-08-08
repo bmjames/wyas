@@ -14,11 +14,14 @@ import Control.Monad.Trans.State.Strict (StateT, runStateT, get, put)
 
 import Data.Text     (Text, pack)
 import Data.Foldable (traverse_)
+import Data.List     (isPrefixOf)
 
 import System.Console.Haskeline
 import System.IO (hPrint, stderr)
 
 import Options.Applicative hiding (handleParseResult)
+
+import qualified Data.Map            as Map
 import qualified Options.Applicative as Optparse
 
 import Data.Attoparsec.Text
@@ -57,9 +60,16 @@ getInput = fmap (fmap $ pack . (++ "\n")) . getInputLine
 repl :: IO ()
 repl =
   void $ flip runStateT primitiveBindings $
-  runInputT defaultSettings $ forever $
+  runInputT settings $ forever $
     getInput ">>> " >>=
       traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
+
+  where
+    settings = setComplete completeIdents defaultSettings
+
+    completeIdents = completeWord Nothing " \n\t" matchPrefix
+
+    matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . Map.keys <$> get
 
 evalExpr :: Text -> IO ()
 evalExpr expr =
