@@ -79,7 +79,7 @@ eval val = case val of
   List [Atom "let", List defns, body] -> eval =<< hoistEval (letToLambda defns body)
 
   List [Atom "load", String filename] ->
-    lift (load filename) >>= evalExprList
+    Bool True <$ (evalExprList =<< lift (load filename))
 
   List (fun : args) -> do f  <- eval fun
                           as <- traverse eval args
