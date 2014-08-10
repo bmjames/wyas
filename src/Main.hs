@@ -2,12 +2,15 @@
 
 module Main where
 
+import Prelude hiding (error)
+
 import WYAS.Parser
 import WYAS.Eval hiding (null)
-import WYAS.Data (LispVal, liftThrows)
+import WYAS.Data (LispVal, LispError(Parser), liftThrows)
 
-import Control.Monad             (forever, void)
+import Control.Monad             (forever, mzero, void, (<=<))
 import Control.Monad.IO.Class    (liftIO)
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Control.Monad.Trans.Class (lift)
 
 import Data.Text     (Text, pack)
@@ -35,20 +38,22 @@ opts =
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
-handleParseResult :: Result LispVal -> InputT EvalIO ()
-handleParseResult parseResult =
-  case parseResult of
-    Fail _ msgs parseErr ->
-      traverse_ putErrLn (parseErr : msgs)
-    Done _ val -> do
-      env <- lift getEnv
-      result <- liftIO $ runEval env (eval val)
-      case result of
-        Left err  -> putErrLn $ show err
-        Right (output, newEnv) -> do outputStrLn (show output)
-                                     lift $ setEnv newEnv
-    Partial resume ->
-      getInput "... " >>= traverse_ (handleParseResult . resume)
+resumeParse :: Result LispVal -> InputT (EvalT (MaybeT IO)) LispVal
+resumeParse parseResult = case parseResult of
+  Fail _ _ err -> lift $ error $ Parser err
+  Done _ val   -> return val
+  Partial f    -> getInput "... " >>=
+                  lift . maybe mzero return >>=
+                  resumeParse . f
+
+evalPrint :: LispVal -> InputT (EvalT (MaybeT IO)) ()
+evalPrint val = do
+  env    <- lift getEnv
+  result <- liftIO $ runEval env $ eval val
+  case result of
+    Left err            -> putErrLn $ show err
+    Right (out, newEnv) -> do outputStrLn $ show out
+                              lift $ setEnv newEnv
 
   where
     putErrLn msg = outputStrLn $ "*** " ++ msg
@@ -57,9 +62,10 @@ getInput :: MonadException f => String -> InputT f (Maybe Text)
 getInput = fmap (fmap $ pack . (++ "\n")) . getInputLine
 
 repl :: IO ()
-repl = void $ runEval primitiveBindings $
+repl = void $ runMaybeT $ runEval primitiveBindings$
   runInputT settings $ forever $
-    getInput ">>> " >>= traverse_ (handleParseResult . parse parseLine)
+    getInput ">>> " >>=
+    traverse_ (evalPrint <=< resumeParse . parse parseLine)
 
   where
     parseLine = skipSpaceAndComment *> parseExpr
