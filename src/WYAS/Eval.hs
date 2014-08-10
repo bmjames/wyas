@@ -7,7 +7,7 @@ import Prelude hiding (null, error)
 
 import Control.Applicative    ((<$>), (<*>))
 
-import Control.Monad.Trans.State  (StateT, runStateT, get, gets, put, modify)
+import Control.Monad.Trans.State.Strict  (StateT, runStateT, get, gets, put, modify)
 import Control.Monad.Trans.Error  (ErrorT, runErrorT, throwError)
 import Control.Monad.Trans.Class  (lift)
 import Control.Monad.IO.Class     (liftIO)
@@ -25,9 +25,15 @@ import qualified Data.Map     as Map
 import qualified Data.Text.IO as Text
 import qualified Data.Vector  as Vector
 
-type EvalT f a = StateT Env (ErrorT LispError f) a
-type EvalIO a = EvalT IO a
-type Eval a = EvalT Identity a
+type EvalT f = StateT Env (ErrorT LispError f)
+type EvalIO  = EvalT IO
+type Eval    = EvalT Identity
+
+getEnv :: Monad f => EvalT f Env
+getEnv = get
+
+setEnv :: Monad f => Env -> EvalT f ()
+setEnv = put
 
 error :: Monad f => LispError -> EvalT f a
 error = lift . throwError

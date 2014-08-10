@@ -4,13 +4,11 @@ module Main where
 
 import WYAS.Parser
 import WYAS.Eval hiding (null)
-import WYAS.Data (Env, LispVal, liftThrows)
+import WYAS.Data (LispVal, liftThrows)
 
 import Control.Monad             (forever, void)
 import Control.Monad.IO.Class    (liftIO)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Error (runErrorT)
-import Control.Monad.Trans.State.Strict (StateT, runStateT, get, put)
 
 import Data.Text     (Text, pack)
 import Data.Foldable (traverse_)
@@ -37,17 +35,18 @@ opts =
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
-handleParseResult :: Result LispVal -> InputT (StateT Env IO) ()
+handleParseResult :: Result LispVal -> InputT EvalIO ()
 handleParseResult parseResult =
   case parseResult of
     Fail _ msgs parseErr ->
       traverse_ putErrLn (parseErr : msgs)
     Done _ val -> do
-      env <- lift get
+      env <- lift getEnv
       result <- liftIO $ runEval env (eval val)
       case result of
         Left err  -> putErrLn $ show err
-        Right (output, newEnv) -> outputStrLn (show output) >> lift (put newEnv)
+        Right (output, newEnv) -> do outputStrLn (show output)
+                                     lift $ setEnv newEnv
     Partial resume ->
       getInput "... " >>= traverse_ (handleParseResult . resume)
 
@@ -58,18 +57,18 @@ getInput :: MonadException f => String -> InputT f (Maybe Text)
 getInput = fmap (fmap $ pack . (++ "\n")) . getInputLine
 
 repl :: IO ()
-repl =
-  void $ flip runStateT primitiveBindings $
+repl = void $ runEval primitiveBindings $
   runInputT settings $ forever $
-    getInput ">>> " >>=
-      traverse_ (handleParseResult . parse (skipSpaceAndComment >> parseExpr))
+    getInput ">>> " >>= traverse_ (handleParseResult . parse parseLine)
 
   where
+    parseLine = skipSpaceAndComment *> parseExpr
+
     settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
 
     completeIdents = completeWord Nothing " \n\t()'" matchPrefix
 
-    matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . idents <$> get
+    matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . idents <$> getEnv
 
     idents env = builtins ++ Map.keys env
 
