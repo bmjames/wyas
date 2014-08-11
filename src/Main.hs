@@ -8,7 +8,7 @@ import WYAS.Parser
 import WYAS.Eval hiding (null)
 import WYAS.Data (LispVal, LispError(Parser), liftThrows)
 
-import Control.Monad             (forever, mzero, void, (<=<))
+import Control.Monad             (forever, mzero, void)
 import Control.Monad.IO.Class    (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Control.Monad.Trans.Class (lift)
@@ -38,15 +38,13 @@ opts =
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
-resumeParse :: Result LispVal -> InputT (EvalT (MaybeT IO)) LispVal
+resumeParse :: Result LispVal -> MaybeT (InputT EvalIO) LispVal
 resumeParse parseResult = case parseResult of
-  Fail _ _ err -> lift $ error $ Parser err
+  Fail _ _ err -> lift $ lift $ error $ Parser err
   Done _ val   -> return val
-  Partial f    -> getInput "... " >>=
-                  lift . maybe mzero return >>=
-                  resumeParse . f
+  Partial f    -> getInput "... " >>= resumeParse . f
 
-evalPrint :: LispVal -> InputT (EvalT (MaybeT IO)) ()
+evalPrint :: LispVal -> InputT EvalIO ()
 evalPrint val = do
   env    <- lift getEnv
   result <- liftIO $ runEval env $ eval val
@@ -58,14 +56,16 @@ evalPrint val = do
   where
     putErrLn msg = outputStrLn $ "*** " ++ msg
 
-getInput :: MonadException f => String -> InputT f (Maybe Text)
-getInput = fmap (fmap $ pack . (++ "\n")) . getInputLine
+getInput :: MonadException f => String -> MaybeT (InputT f) Text
+getInput prompt = do
+  line <- lift $ getInputLine prompt
+  maybe mzero return $ fmap (pack . (++ "\n")) line
 
 repl :: IO ()
-repl = void $ runMaybeT $ runEval primitiveBindings$
+repl = void $ runEval primitiveBindings $
   runInputT settings $ forever $
-    getInput ">>> " >>=
-    traverse_ (evalPrint <=< resumeParse . parse parseLine)
+    runMaybeT (getInput ">>> " >>= resumeParse . parse parseLine) >>=
+    traverse_ evalPrint
 
   where
     parseLine = skipSpaceAndComment *> parseExpr
