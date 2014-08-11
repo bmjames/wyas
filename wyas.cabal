@@ -40,12 +40,12 @@ library
   default-language:    Haskell2010
 
 test-suite tests
-  type:                detailed-0.9
-  test-module:         WYAS.Tests
+  type:                exitcode-stdio-1.0
+  main-is:             Tests.hs
   hs-source-dirs:      tests
   build-depends:       base
                      , wyas
-                     , Cabal >=1.20.0.2
                      , HUnit >=1.2.5
-                     , cabal-test-hunit
+                     , test-framework
+                     , test-framework-hunit
   default-language:    Haskell2010
