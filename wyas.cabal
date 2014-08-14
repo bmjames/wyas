@@ -23,18 +23,18 @@ executable wyasi
                      , mmorph >=1.0 && <1.1
                      , containers >=0.5 && <0.6
                      , optparse-applicative >=0.9 && <0.10
-                     , haskeline >=0.7 && <0.8
   hs-source-dirs:      src     
   default-language:    Haskell2010
 
 library
-  exposed-modules:     WYAS.Data, WYAS.Eval, WYAS.Parser
+  exposed-modules:     WYAS.Data, WYAS.Eval, WYAS.Parser, WYAS.REPL
   build-depends:       base >=4.6 && <4.8
                      , text >=1.1 && <1.2
                      , attoparsec >=0.12 && <0.13
                      , vector >=0.10 && <0.11
                      , transformers >=0.4 && <0.5
                      , mmorph >=1.0 && <1.1
+                     , haskeline >=0.7 && <0.8
                      , containers >=0.5 && <0.6
   hs-source-dirs:      lib
   default-language:    Haskell2010
