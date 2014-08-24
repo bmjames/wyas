@@ -3,11 +3,11 @@ module WYAS.REPL where
 import Prelude hiding (error)
 
 import WYAS.Data
-import WYAS.Eval
+import WYAS.Eval hiding (null)
 import WYAS.Parser
 
 import Control.Applicative       ((*>), (<$>))
-import Control.Monad             (forever, mzero, void)
+import Control.Monad             (forever, guard, mzero, void)
 import Control.Monad.IO.Class    (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
@@ -41,8 +41,10 @@ evalPrint val = do
 
 getInput :: MonadException f => String -> MaybeT (InputT f) Text
 getInput prompt = do
-  line <- lift $ getInputLine prompt
-  maybe mzero return $ fmap (pack . (++ "\n")) line
+  maybeLine <- lift $ getInputLine prompt
+  line      <- maybe mzero return maybeLine
+  guard $ not $ null line
+  return $ pack $ line ++ "\n"
 
 repl :: InputT EvalIO ()
 repl = forever $
