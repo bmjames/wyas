@@ -21,11 +21,13 @@ import System.Console.Haskeline
 
 import qualified Data.Map as Map
 
-resumeParse :: Result LispVal -> MaybeT (InputT EvalIO) LispVal
-resumeParse parseResult = case parseResult of
-  Fail _ _ err -> lift $ lift $ error $ Parser err
-  Done _ val   -> return val
-  Partial f    -> getInput "... " >>= resumeParse . f
+parseMultiLine :: Parser a -> InputT EvalIO (Maybe a)
+parseMultiLine parseLine =
+  runMaybeT $ step . parse parseLine =<< getInput ">>> "
+  where
+    step (Fail _ _ err) = lift $ lift $ error $ Parser err
+    step (Done _ val)   = return val
+    step (Partial f)    = step . f =<< getInput "... "
 
 evalPrint :: LispVal -> InputT EvalIO ()
 evalPrint val = do
@@ -35,7 +37,6 @@ evalPrint val = do
     Left err            -> putErrLn $ show err
     Right (out, newEnv) -> do outputStrLn $ show out
                               lift $ setEnv newEnv
-
   where
     putErrLn msg = outputStrLn $ "*** " ++ msg
 
@@ -47,16 +48,13 @@ getInput prompt = do
   return $ pack $ line ++ "\n"
 
 repl :: InputT EvalIO ()
-repl = forever $
-  runMaybeT (getInput ">>> " >>= resumeParse . parse parseLine) >>=
-  traverse_ evalPrint
-
+repl = forever $ parseMultiLine parseLine >>= traverse_ evalPrint
   where
     parseLine = skipSpaceAndComment *> parseExpr
 
 replMain :: IO ()
-replMain = void $ runEval primitiveBindings $
-  runInputT settings $ repl
+replMain =
+  void $ runEval primitiveBindings $ runInputT settings repl
 
   where
     settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
