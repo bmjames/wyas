@@ -38,7 +38,7 @@ parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
                   <|> ('\\' <$ char '\\')
 
 parseChar :: Parser LispVal
-parseChar = Character <$> char' <?> "character"
+parseChar = Character <$> char'
   where
     char'     = string "#\\" *> (namedChar <|> anyChar <|> pure ' ')
     namedChar =     (' '  <$ iString "space")
@@ -118,14 +118,14 @@ skipComment :: Parser ()
 skipComment = (string ";;" *> many (noneOf ['\n']) *> pure ()) <?> "comment"
 
 skipSpace :: Parser ()
-skipSpace = void $ many (noneOf " \n\t\r")
+skipSpace = void $ many $ oneOf " \n\t\r"
 
 skipSpaceAndComment :: Parser ()
 skipSpaceAndComment = skipSpace *> option () (skipComment *> skipSpaceAndComment)
 
 parseExpr :: Parser LispVal
-parseExpr = parseNumber
-            <|> parseChar
+parseExpr = (try parseNumber <?> "number")
+            <|> (try parseChar <?> "char")
             <|> parseVector
             <|> parseAtom
             <|> parseString
