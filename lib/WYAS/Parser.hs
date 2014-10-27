@@ -7,16 +7,17 @@ import Prelude hiding (takeWhile)
 import WYAS.Data
 
 import Control.Applicative
-import Control.Monad.Trans.Error (throwError)
+import Control.Monad.Trans.Error (throwError, runErrorT)
 
 import Text.Trifecta hiding (parseString, symbol)
 import Text.Trifecta.Delta (Delta(Columns))
 import qualified Text.Trifecta as Trifecta
+import Text.PrettyPrint.ANSI.Leijen (putDoc)
 
 import Data.Char        (digitToInt, toLower, toUpper)
 import Data.Traversable (traverse)
-import Data.Text        (Text, unpack)
 import Data.Functor     (void)
+import Data.Functor.Identity (runIdentity)
 
 import Numeric          (readOct, readHex, readInt, readFloat)
 
@@ -114,7 +115,7 @@ endBy :: Parser a -> Parser b -> Parser [a]
 endBy p sep = many (p <* sep)
 
 skipComment :: Parser ()
-skipComment = string ";;" *> many (noneOf ['\n']) *> pure ()
+skipComment = (string ";;" *> many (noneOf ['\n']) *> pure ()) <?> "comment"
 
 skipSpace :: Parser ()
 skipSpace = void $ many (noneOf " \n\t\r")
@@ -131,14 +132,14 @@ parseExpr = parseNumber
             <|> parseQuoted
             <|> parseListOrPairs
 
-readOrThrow :: Parser a -> Text -> ThrowsError a
-readOrThrow parser t =
-  case Trifecta.parseString parser (Columns 0 0) (unpack t) of
+readOrThrow :: Parser a -> String -> ThrowsError a
+readOrThrow parser s =
+  case Trifecta.parseString parser (Columns 0 0) s of
     Success a -> return a
-    Failure d -> throwError $ ParseError $ show d
+    Failure d -> throwError $ ParseError d
 
-readExpr :: Text -> ThrowsError LispVal
+readExpr :: String -> ThrowsError LispVal
 readExpr = readOrThrow (skipSpaceAndComment *> parseExpr)
 
-readExprList :: Text -> ThrowsError [LispVal]
+readExprList :: String -> ThrowsError [LispVal]
 readExprList = readOrThrow (skipSpaceAndComment *> sepBy parseExpr skipSpaceAndComment)

@@ -188,7 +188,7 @@ closePort _           = return $ Bool False
 
 readProc :: [LispVal] -> IOThrowsError LispVal
 readProc []          = readProc [Port stdin]
-readProc [Port port] = liftIO (Text.hGetLine port) >>= liftThrows . readExpr
+readProc [Port port] = liftIO (hGetLine port) >>= liftThrows . readExpr
 readProc [badArg]    = throwError $ TypeMismatch "string" badArg
 readProc badArgs     = throwError $ NumArgs 1 badArgs
 
@@ -203,7 +203,7 @@ readContents [badArg]          = throwError $ TypeMismatch "string" badArg
 readContents badArgs           = throwError $ NumArgs 1 badArgs
 
 load :: String -> IOThrowsError [LispVal]
-load filename = liftIO (Text.readFile filename) >>= liftThrows . readExprList
+load filename = liftIO (readFile filename) >>= liftThrows . readExprList
 
 readAll :: [LispVal] -> IOThrowsError LispVal
 readAll [String filename] = fmap List $ load filename

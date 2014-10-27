@@ -1,6 +1,6 @@
 module WYAS.Data where
 
-import Control.Monad.Trans.Error (Error(..), ErrorT, throwError)
+import Control.Monad.Trans.Error (Error(..), ErrorT)
 import Control.Monad.Morph       (hoist, generalize)
 
 import Data.Functor.Identity (Identity)
@@ -8,6 +8,7 @@ import Data.Foldable         (foldMap)
 import Data.Map              (Map)
 
 import System.IO (Handle)
+import Text.PrettyPrint.ANSI.Leijen (Doc)
 
 import qualified Data.Vector as V
 
@@ -101,7 +102,7 @@ instance Show LispVal where
 
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
-               | ParseError String
+               | ParseError Doc
                | BadSpecialForm String LispVal
                | NotFunction String LispVal
                | UnboundVar String

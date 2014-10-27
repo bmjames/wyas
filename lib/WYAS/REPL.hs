@@ -31,7 +31,7 @@ parseMultiLine parseLine =
   runMaybeT $ go . flip feed (stepParser (release d *> parseLine) mempty mempty) =<< getInput ">>> "
 
   where
-    go (StepFail r doc) = lift $ lift $ error $ ParseError $ show doc
+    go (StepFail r doc) = lift $ lift $ error $ ParseError doc
     go (StepDone _ a)   = return a
     go (StepCont r _ f) = go . f . snoc r =<< getInput "... "
 
