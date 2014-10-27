@@ -101,7 +101,7 @@ instance Show LispVal where
 
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
-               | Parser String
+               | ParseError String
                | BadSpecialForm String LispVal
                | NotFunction String LispVal
                | UnboundVar String

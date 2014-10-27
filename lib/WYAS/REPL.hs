@@ -12,10 +12,15 @@ import Control.Monad.IO.Class    (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 
-import Data.Attoparsec.Text
+import Text.Trifecta
+import Text.Trifecta.Delta (Delta(Columns))
+
+
 import Data.Foldable (traverse_)
 import Data.List     (isPrefixOf)
-import Data.Text     (Text, pack)
+import Data.ByteString.Char8 (ByteString, pack)
+import Data.Monoid   (mempty)
+import Data.Semigroup.Reducer (snoc)
 
 import System.Console.Haskeline
 
@@ -23,11 +28,14 @@ import qualified Data.Map as Map
 
 parseMultiLine :: Parser a -> InputT EvalIO (Maybe a)
 parseMultiLine parseLine =
-  runMaybeT $ step . parse parseLine =<< getInput ">>> "
+  runMaybeT $ go . flip feed (stepParser (release d *> parseLine) mempty mempty) =<< getInput ">>> "
+
   where
-    step (Fail _ _ err) = lift $ lift $ error $ Parser err
-    step (Done _ val)   = return val
-    step (Partial f)    = step . f =<< getInput "... "
+    go (StepFail r doc) = lift $ lift $ error $ ParseError $ show doc
+    go (StepDone _ a)   = return a
+    go (StepCont r _ f) = go . f . snoc r =<< getInput "... "
+
+    d = Columns 0 0
 
 evalPrint :: LispVal -> InputT EvalIO ()
 evalPrint val = do
@@ -40,7 +48,7 @@ evalPrint val = do
   where
     putErrLn msg = outputStrLn $ "*** " ++ msg
 
-getInput :: MonadException f => String -> MaybeT (InputT f) Text
+getInput :: MonadException f => String -> MaybeT (InputT f) ByteString
 getInput prompt = do
   maybeLine <- lift $ getInputLine prompt
   line      <- maybe mzero return maybeLine
