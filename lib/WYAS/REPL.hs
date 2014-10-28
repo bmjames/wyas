@@ -15,7 +15,6 @@ import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Text.Trifecta
 import Text.Trifecta.Delta (Delta(Columns))
 
-
 import Data.Foldable (traverse_)
 import Data.List     (isPrefixOf)
 import Data.ByteString.Char8 (ByteString, pack)
@@ -31,7 +30,7 @@ parseMultiLine parseLine =
   runMaybeT $ go . flip feed (stepParser (release d *> parseLine) mempty mempty) =<< getInput ">>> "
 
   where
-    go (StepFail r doc) = lift $ lift $ error $ ParseError doc
+    go (StepFail _ doc) = lift $ lift $ error $ ParseError doc
     go (StepDone _ a)   = return a
     go (StepCont r _ f) = go . f . snoc r =<< getInput "... "
 
@@ -42,6 +41,7 @@ evalPrint val = do
   env    <- lift getEnv
   result <- liftIO $ runEval env $ eval val
   case result of
+    Left (ParseError e) -> putErrLn $ show e
     Left err            -> putErrLn $ show err
     Right (out, newEnv) -> do outputStrLn $ show out
                               lift $ setEnv newEnv

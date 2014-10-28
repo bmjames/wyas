@@ -12,7 +12,6 @@ import Control.Monad.Trans.Error (throwError, runErrorT)
 import Text.Trifecta hiding (parseString, symbol)
 import Text.Trifecta.Delta (Delta(Columns))
 import qualified Text.Trifecta as Trifecta
-import Text.PrettyPrint.ANSI.Leijen (putDoc)
 
 import Data.Char        (digitToInt, toLower, toUpper)
 import Data.Traversable (traverse)
@@ -89,7 +88,7 @@ parseFloat = Float <$> fst . head . readFloat <$> float' where
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
-  char '\''
+  _ <- char '\''
   e <- parseExpr
   return $ List [Atom "quote", e]
 
@@ -98,7 +97,7 @@ parseListOrPairs = do
   char '(' *> skipSpaceAndComment
   es  <- exprs
   val <- (dottedList es <?> "dotted list") <|> pure (List es)
-  skipSpaceAndComment *> char ')'
+  _   <- char ')'
   return val
 
   where
@@ -109,10 +108,7 @@ parseVector = Vector . V.fromList <$> vec where
   vec = (string "#(" *> exprs <* char ')') <?> "vector"
 
 exprs :: Parser [LispVal]
-exprs = parseExpr `sepBy` skipSpaceAndComment <?> "[expr..]"
-
-endBy :: Parser a -> Parser b -> Parser [a]
-endBy p sep = many (p <* sep)
+exprs = parseExpr `endBy` skipSpaceAndComment <?> "expr..."
 
 skipComment :: Parser ()
 skipComment = (string ";;" *> many (noneOf ['\n']) *> pure ()) <?> "comment"
