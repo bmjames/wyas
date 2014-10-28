@@ -31,6 +31,7 @@ library
   exposed-modules:     WYAS.Data, WYAS.Eval, WYAS.Parser, WYAS.REPL
   build-depends:       base >=4.6 && <4.8
                      , bytestring
+                     , utf8-string
                      , text >=1.1 && <1.2
                      , attoparsec >=0.12 && <0.13
                      , vector >=0.10 && <0.11

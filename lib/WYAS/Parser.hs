@@ -10,18 +10,17 @@ import Control.Applicative
 import Control.Monad.Trans.Error (throwError, runErrorT)
 
 import Text.Trifecta hiding (parseString, symbol)
-import Text.Trifecta.Delta (Delta(Columns))
+import Text.Trifecta.Delta (Delta(Directed))
 import qualified Text.Trifecta as Trifecta
 
-import Data.Char        (digitToInt, toLower, toUpper)
-import Data.Traversable (traverse)
-import Data.Functor     (void)
+import Data.Char             (digitToInt, toLower, toUpper)
+import Data.Traversable      (traverse)
+import Data.Functor          (void)
 import Data.Functor.Identity (runIdentity)
-
-import Numeric          (readOct, readHex, readInt, readFloat)
-
+import qualified Data.ByteString.UTF8 as UTF8
 import qualified Data.Vector as V
 
+import Numeric          (readOct, readHex, readInt, readFloat)
 
 symbol :: Parser Char
 symbol = oneOf "-!#$%&|*+/:<=>?@^_~"
@@ -128,14 +127,14 @@ parseExpr = (try parseNumber <?> "number")
             <|> parseQuoted
             <|> parseListOrPairs
 
-readOrThrow :: Parser a -> String -> ThrowsError a
-readOrThrow parser s =
-  case Trifecta.parseString parser (Columns 0 0) s of
+readOrThrow :: Parser a -> FilePath -> String -> ThrowsError a
+readOrThrow parser file s =
+  case Trifecta.parseString parser (Directed (UTF8.fromString file) 0 0 0 0) s of
     Success a -> return a
     Failure d -> throwError $ ParseError d
 
-readExpr :: String -> ThrowsError LispVal
+readExpr :: FilePath -> String -> ThrowsError LispVal
 readExpr = readOrThrow (skipSpaceAndComment *> parseExpr <* skipSpaceAndComment)
 
-readExprList :: String -> ThrowsError [LispVal]
+readExprList :: FilePath -> String -> ThrowsError [LispVal]
 readExprList = readOrThrow $ skipSpaceAndComment *> endBy parseExpr skipSpaceAndComment

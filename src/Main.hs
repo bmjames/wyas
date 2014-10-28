@@ -30,7 +30,7 @@ parseOpts =
 
 evalExpr :: String -> IO ()
 evalExpr expr =
-  printEval $ lift (liftThrows $ readExprList expr) >>= evalExprList
+  printEval $ lift (liftThrows $ readExprList "eval" expr) >>= evalExprList
 
 runFile :: FilePath -> IO ()
 runFile filename =
