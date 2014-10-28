@@ -7,7 +7,7 @@ import Prelude hiding (takeWhile)
 import WYAS.Data
 
 import Control.Applicative
-import Control.Monad.Trans.Error (throwError, runErrorT)
+import Control.Monad.Trans.Error (throwError)
 
 import Text.Trifecta hiding (parseString, symbol)
 import Text.Trifecta.Delta (Delta(Directed))
@@ -16,7 +16,6 @@ import qualified Text.Trifecta as Trifecta
 import Data.Char             (digitToInt, toLower, toUpper)
 import Data.Traversable      (traverse)
 import Data.Functor          (void)
-import Data.Functor.Identity (runIdentity)
 import qualified Data.ByteString.UTF8 as UTF8
 import qualified Data.Vector as V
 
@@ -66,17 +65,15 @@ parseNumber = (parseInt <|> char '#' *> parseNumber') <?> "number"
 
 parseBin :: Parser LispVal
 parseBin = parseBin' <?> "binary" where
-  parseBin' = fmap Number $ fst . head . readBin <$> some binDigit
+  parseBin' = Number <$> fst . head . readBin <$> some binDigit
   binDigit  = satisfy (\c -> c == '0' || c == '1') <?> "'0' or '1'"
   readBin   = readInt 2 (`elem` "01") digitToInt
 
 parseOct :: Parser LispVal
-parseOct = fmap Number $ fst . head . readOct <$> some octDigit
-  where octDigit = oneOf ['0'..'7']
+parseOct = Number <$> fst . head . readOct <$> some octDigit
 
 parseHex :: Parser LispVal
-parseHex = fmap Number $ fst . head . readHex <$> some hexDigit
-  where hexDigit = oneOf $ ['0'..'9'] ++ ['a'..'f']
+parseHex = Number <$> fst . head . readHex <$> some hexDigit
 
 parseFloat :: Parser LispVal
 parseFloat = Float <$> fst . head . readFloat <$> float' where
@@ -110,7 +107,7 @@ exprs :: Parser [LispVal]
 exprs = parseExpr `endBy` skipSpaceAndComment <?> "expr..."
 
 skipComment :: Parser ()
-skipComment = (string ";;" *> many (noneOf ['\n']) *> pure ()) <?> "comment"
+skipComment = (string ";;" *> many (notChar '\n') *> pure ()) <?> "comment"
 
 skipSpace :: Parser ()
 skipSpace = void $ many $ oneOf " \n\t\r"
