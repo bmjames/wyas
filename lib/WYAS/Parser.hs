@@ -135,7 +135,7 @@ readOrThrow parser s =
     Failure d -> throwError $ ParseError d
 
 readExpr :: String -> ThrowsError LispVal
-readExpr = readOrThrow (skipSpaceAndComment *> parseExpr)
+readExpr = readOrThrow (skipSpaceAndComment *> parseExpr <* skipSpaceAndComment)
 
 readExprList :: String -> ThrowsError [LispVal]
-readExprList = readOrThrow (skipSpaceAndComment *> sepBy parseExpr skipSpaceAndComment)
+readExprList = readOrThrow $ skipSpaceAndComment *> endBy parseExpr skipSpaceAndComment
