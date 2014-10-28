@@ -160,7 +160,7 @@ applyUserFun fun args = case fun of
     value <- eval body
     put curEnv
     return value
-  notFun -> error $ NotFunction "Not a function" notFun
+  notFun -> error $ NotFunction notFun
 
 primitiveBindings :: Env
 primitiveBindings = Map.union (fmap PrimFun primitives) (fmap IOFun ioPrimitives)
@@ -188,7 +188,7 @@ closePort _           = return $ Bool False
 
 readProc :: [LispVal] -> IOThrowsError LispVal
 readProc []          = readProc [Port stdin]
-readProc [Port port] = liftIO (Text.hGetLine port) >>= liftThrows . readExpr
+readProc [Port port] = liftIO (hGetLine port) >>= liftThrows . readExpr (show port)
 readProc [badArg]    = throwError $ TypeMismatch "string" badArg
 readProc badArgs     = throwError $ NumArgs 1 badArgs
 
@@ -202,11 +202,11 @@ readContents [String filename] = fmap String $ liftIO $ readFile filename
 readContents [badArg]          = throwError $ TypeMismatch "string" badArg
 readContents badArgs           = throwError $ NumArgs 1 badArgs
 
-load :: String -> IOThrowsError [LispVal]
-load filename = liftIO (Text.readFile filename) >>= liftThrows . readExprList
+load :: FilePath -> IOThrowsError [LispVal]
+load file = liftIO (readFile file) >>= liftThrows . readExprList file
 
 readAll :: [LispVal] -> IOThrowsError LispVal
-readAll [String filename] = fmap List $ load filename
+readAll [String filename] = List <$> load filename
 readAll [badArg]          = throwError $ TypeMismatch "string" badArg
 readAll badArgs           = throwError $ NumArgs 1 badArgs
 

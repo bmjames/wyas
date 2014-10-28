@@ -11,28 +11,26 @@ import WYAS.REPL (replMain)
 
 import Control.Monad.Trans.Class (lift)
 
-import Data.Text     (Text, pack)
-
 import System.IO (hPrint, stderr)
 
 import Options.Applicative hiding (handleParseResult)
 
 import qualified Options.Applicative as Optparse
 
-data Opts = Eval    Text
+data Opts = Eval String
           | RunFile FilePath
           | REPL
           deriving (Eq, Show)
 
 parseOpts :: Optparse.Parser Opts
 parseOpts =
-  (Eval . pack <$> strOption (short 'e' <> metavar "EXPRESSION"))
+  (Eval <$> strOption (short 'e' <> metavar "EXPRESSION"))
   <|> (RunFile <$> argument str (metavar "FILENAME"))
   <|> pure REPL
 
-evalExpr :: Text -> IO ()
+evalExpr :: String -> IO ()
 evalExpr expr =
-  printEval $ lift (liftThrows $ readExprList expr) >>= evalExprList
+  printEval $ lift (liftThrows $ readExprList "eval" expr) >>= evalExprList
 
 runFile :: FilePath -> IO ()
 runFile filename =

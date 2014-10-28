@@ -1,6 +1,6 @@
 module WYAS.Data where
 
-import Control.Monad.Trans.Error (Error(..), ErrorT, throwError)
+import Control.Monad.Trans.Error (Error(..), ErrorT)
 import Control.Monad.Morph       (hoist, generalize)
 
 import Data.Functor.Identity (Identity)
@@ -8,6 +8,7 @@ import Data.Foldable         (foldMap)
 import Data.Map              (Map)
 
 import System.IO (Handle)
+import Text.PrettyPrint.ANSI.Leijen (Doc)
 
 import qualified Data.Vector as V
 
@@ -101,12 +102,21 @@ instance Show LispVal where
 
 data LispError = NumArgs Integer [LispVal]
                | TypeMismatch String LispVal
-               | Parser String
+               | ParseError Doc
                | BadSpecialForm String LispVal
-               | NotFunction String LispVal
+               | NotFunction LispVal
                | UnboundVar String
                | Default String
-               deriving Show
+
+instance Show LispError where
+  show error = case error of
+    NumArgs i vals     -> "Arity error: expected " ++ show i ++ " args, got " ++ show (length vals)
+    TypeMismatch t v   -> "Type mismatch: expected " ++ t ++ ", got: " ++ show v
+    ParseError doc     -> show doc
+    BadSpecialForm f v -> "Bad special form: expected " ++ f ++ ", got: " ++ show v
+    NotFunction f      -> "Not a function: " ++ show f
+    UnboundVar name    -> "Unbound variable: " ++ name
+    Default s          -> s
 
 liftThrows :: ThrowsError a -> IOThrowsError a
 liftThrows = hoist generalize

@@ -7,20 +7,23 @@ import Prelude hiding (takeWhile)
 import WYAS.Data
 
 import Control.Applicative
-import Control.Monad.Trans.Error (throwError)
+import Control.Monad.Trans.Error (throwError, runErrorT)
 
-import Data.Attoparsec.Text
-import Data.Char        (digitToInt, toLower, toUpper)
-import Data.Traversable (traverse)
-import Data.Text        (Text)
+import Text.Trifecta hiding (parseString, symbol)
+import Text.Trifecta.Delta (Delta(Directed))
+import qualified Text.Trifecta as Trifecta
+
+import Data.Char             (digitToInt, toLower, toUpper)
+import Data.Traversable      (traverse)
+import Data.Functor          (void)
+import Data.Functor.Identity (runIdentity)
+import qualified Data.ByteString.UTF8 as UTF8
+import qualified Data.Vector as V
 
 import Numeric          (readOct, readHex, readInt, readFloat)
 
-import qualified Data.Vector as V
-
-
 symbol :: Parser Char
-symbol = satisfy (inClass "-!#$%&|*+/:<=>?@^_~") <?> "symbol"
+symbol = oneOf "-!#$%&|*+/:<=>?@^_~"
 
 parseString :: Parser LispVal
 parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
@@ -33,7 +36,7 @@ parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
                   <|> ('\\' <$ char '\\')
 
 parseChar :: Parser LispVal
-parseChar = Character <$> char' <?> "character"
+parseChar = Character <$> char'
   where
     char'     = string "#\\" *> (namedChar <|> anyChar <|> pure ' ')
     namedChar =     (' '  <$ iString "space")
@@ -55,7 +58,7 @@ parseAtom = atom <?> "symbol" where
 parseNumber :: Parser LispVal
 parseNumber = (parseInt <|> char '#' *> parseNumber') <?> "number"
   where
-    parseInt     = Number . read <$> many1 digit
+    parseInt     = Number . read <$> some digit
     parseNumber' = char 'o' *> parseOct
                <|> char 'x' *> parseHex
                <|> char 'b' *> parseBin
@@ -63,28 +66,28 @@ parseNumber = (parseInt <|> char '#' *> parseNumber') <?> "number"
 
 parseBin :: Parser LispVal
 parseBin = parseBin' <?> "binary" where
-  parseBin' = fmap Number $ fst . head . readBin <$> many1 binDigit
+  parseBin' = fmap Number $ fst . head . readBin <$> some binDigit
   binDigit  = satisfy (\c -> c == '0' || c == '1') <?> "'0' or '1'"
   readBin   = readInt 2 (`elem` "01") digitToInt
 
 parseOct :: Parser LispVal
-parseOct = fmap Number $ fst . head . readOct <$> many1 octDigit
-  where octDigit = satisfy (inClass "0-7") <?> "'0'..'7'"
+parseOct = fmap Number $ fst . head . readOct <$> some octDigit
+  where octDigit = oneOf ['0'..'7']
 
 parseHex :: Parser LispVal
-parseHex = fmap Number $ fst . head . readHex <$> many1 hexDigit
-  where hexDigit = satisfy (inClass "0-9a-f") <?> "'0'..'f'"
+parseHex = fmap Number $ fst . head . readHex <$> some hexDigit
+  where hexDigit = oneOf $ ['0'..'9'] ++ ['a'..'f']
 
 parseFloat :: Parser LispVal
 parseFloat = Float <$> fst . head . readFloat <$> float' where
-  float' = do int  <- many1 digit
+  float' = do int  <- some digit
               _    <- char '.'
-              frac <- many1 digit
+              frac <- some digit
               return $ int ++ "." ++ frac
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
-  char '\''
+  _ <- char '\''
   e <- parseExpr
   return $ List [Atom "quote", e]
 
@@ -93,7 +96,7 @@ parseListOrPairs = do
   char '(' *> skipSpaceAndComment
   es  <- exprs
   val <- (dottedList es <?> "dotted list") <|> pure (List es)
-  skipSpaceAndComment *> char ')'
+  _   <- char ')'
   return val
 
   where
@@ -104,32 +107,34 @@ parseVector = Vector . V.fromList <$> vec where
   vec = (string "#(" *> exprs <* char ')') <?> "vector"
 
 exprs :: Parser [LispVal]
-exprs = parseExpr `sepBy` skipSpaceAndComment <?> "[expr..]"
-
-endBy :: Parser a -> Parser b -> Parser [a]
-endBy p sep = many (p <* sep)
+exprs = parseExpr `endBy` skipSpaceAndComment <?> "expr..."
 
 skipComment :: Parser ()
-skipComment = string ";;" *> takeWhile (/= '\n') *> pure ()
+skipComment = (string ";;" *> many (noneOf ['\n']) *> pure ()) <?> "comment"
+
+skipSpace :: Parser ()
+skipSpace = void $ many $ oneOf " \n\t\r"
 
 skipSpaceAndComment :: Parser ()
 skipSpaceAndComment = skipSpace *> option () (skipComment *> skipSpaceAndComment)
 
 parseExpr :: Parser LispVal
-parseExpr = parseNumber
-            <|> parseChar
+parseExpr = (try parseNumber <?> "number")
+            <|> (try parseChar <?> "char")
             <|> parseVector
             <|> parseAtom
             <|> parseString
             <|> parseQuoted
             <|> parseListOrPairs
 
-readOrThrow :: Parser a -> Text -> ThrowsError a
-readOrThrow parser =
-  either (throwError . Parser) return . parseOnly parser
+readOrThrow :: Parser a -> FilePath -> String -> ThrowsError a
+readOrThrow parser file s =
+  case Trifecta.parseString parser (Directed (UTF8.fromString file) 0 0 0 0) s of
+    Success a -> return a
+    Failure d -> throwError $ ParseError d
 
-readExpr :: Text -> ThrowsError LispVal
-readExpr = readOrThrow (skipSpaceAndComment *> parseExpr)
+readExpr :: FilePath -> String -> ThrowsError LispVal
+readExpr = readOrThrow (skipSpaceAndComment *> parseExpr <* skipSpaceAndComment)
 
-readExprList :: Text -> ThrowsError [LispVal]
-readExprList = readOrThrow (skipSpaceAndComment *> sepBy parseExpr skipSpaceAndComment)
+readExprList :: FilePath -> String -> ThrowsError [LispVal]
+readExprList = readOrThrow $ skipSpaceAndComment *> endBy parseExpr skipSpaceAndComment

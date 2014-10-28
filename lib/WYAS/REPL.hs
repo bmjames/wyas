@@ -6,16 +6,20 @@ import WYAS.Data
 import WYAS.Eval hiding (null)
 import WYAS.Parser
 
-import Control.Applicative       ((*>), (<$>))
+import Control.Applicative       ((*>), (<$>), (<$))
 import Control.Monad             (forever, guard, mzero, void)
-import Control.Monad.IO.Class    (liftIO)
+import Control.Monad.IO.Class    (MonadIO, liftIO)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 
-import Data.Attoparsec.Text
+import Text.Trifecta
+import Text.Trifecta.Delta (Delta(Columns))
+
 import Data.Foldable (traverse_)
 import Data.List     (isPrefixOf)
-import Data.Text     (Text, pack)
+import Data.ByteString.Char8 (ByteString, pack)
+import Data.Monoid   (mempty)
+import Data.Semigroup.Reducer (snoc)
 
 import System.Console.Haskeline
 
@@ -23,11 +27,15 @@ import qualified Data.Map as Map
 
 parseMultiLine :: Parser a -> InputT EvalIO (Maybe a)
 parseMultiLine parseLine =
-  runMaybeT $ step . parse parseLine =<< getInput ">>> "
+  runMaybeT $ go . flip feed (stepParser (release d *> parseLine) mempty mempty) =<< getInput ">>> "
+
   where
-    step (Fail _ _ err) = lift $ lift $ error $ Parser err
-    step (Done _ val)   = return val
-    step (Partial f)    = step . f =<< getInput "... "
+    go :: Step a -> MaybeT (InputT EvalIO) a
+    go (StepFail _ doc) = MaybeT $ Nothing <$ putErrLn (show doc)
+    go (StepDone _ a)   = return a
+    go (StepCont r _ f) = go . f . snoc r =<< getInput "... "
+
+    d = Columns 0 0
 
 evalPrint :: LispVal -> InputT EvalIO ()
 evalPrint val = do
@@ -37,10 +45,11 @@ evalPrint val = do
     Left err            -> putErrLn $ show err
     Right (out, newEnv) -> do outputStrLn $ show out
                               lift $ setEnv newEnv
-  where
-    putErrLn msg = outputStrLn $ "*** " ++ msg
 
-getInput :: MonadException f => String -> MaybeT (InputT f) Text
+putErrLn :: MonadIO m => String -> InputT m ()
+putErrLn msg = outputStrLn $ "*** " ++ msg
+
+getInput :: MonadException f => String -> MaybeT (InputT f) ByteString
 getInput prompt = do
   maybeLine <- lift $ getInputLine prompt
   line      <- maybe mzero return maybeLine
@@ -56,9 +65,9 @@ replMain :: IO ()
 replMain =
   void $ runEval primitiveBindings $ runInputT settings repl
 
-  where
-    settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
+settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
 
+  where
     completeIdents = completeWord Nothing " \n\t()'" matchPrefix
 
     matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . idents <$> getEnv
