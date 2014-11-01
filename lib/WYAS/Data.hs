@@ -1,9 +1,9 @@
 module WYAS.Data where
 
-import Control.Monad.Trans.Error (Error(..), ErrorT)
+import Control.Monad.Trans.Error (Error(..), ErrorT, runErrorT)
 import Control.Monad.Morph       (hoist, generalize)
 
-import Data.Functor.Identity (Identity)
+import Data.Functor.Identity (Identity, runIdentity)
 import Data.Foldable         (foldMap)
 import Data.Map              (Map)
 
@@ -14,6 +14,9 @@ import qualified Data.Vector as V
 
 type ThrowsError = ErrorT LispError Identity
 type IOThrowsError = ErrorT LispError IO
+
+runThrowsError :: ThrowsError a -> Either LispError a
+runThrowsError = runIdentity . runErrorT
 
 type LispFun = [LispVal] -> ThrowsError LispVal
 type IOFun = [LispVal] -> IOThrowsError LispVal
@@ -72,27 +75,28 @@ isSymbol (Atom _) = True
 isSymbol _        = False
 
 showVal :: LispVal -> String
-showVal val = case val of
-  Atom name       -> name
-  List vs         -> "(" ++ unwordsVal vs ++ ")"
-  DottedList vs v -> "(" ++ unwordsVal vs ++ " . " ++ showVal v ++ ")"
-  Vector vs       -> "#(" ++ unwordsVal (V.toList vs) ++ ")"
-  Number i        -> show i
-  Float d         -> show d
-  String s        -> show s
-  Bool True       -> "#t"
-  Bool False      -> "#f"
-  Character ' '   -> "#\\space"
-  Character '\t'  -> "#\\tab"
-  Character '\n'  -> "#\\newline"
-  Character c     -> ['#', '\\', c]
+showVal val =
+  case val of
+    Atom name       -> name
+    List vs         -> "(" ++ unwordsVal vs ++ ")"
+    DottedList vs v -> "(" ++ unwordsVal vs ++ " . " ++ showVal v ++ ")"
+    Vector vs       -> "#(" ++ unwordsVal (V.toList vs) ++ ")"
+    Number i        -> show i
+    Float d         -> show d
+    String s        -> show s
+    Bool True       -> "#t"
+    Bool False      -> "#f"
+    Character ' '   -> "#\\space"
+    Character '\t'  -> "#\\tab"
+    Character '\n'  -> "#\\newline"
+    Character c     -> ['#', '\\', c]
 
-  Function _ params vararg  _ ->
-    "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
+    Function _ params vararg  _ ->
+      "(lambda (" ++ unwords params ++ foldMap (" . " ++) vararg ++ ") ...)"
 
-  PrimFun _     -> "<primitive>"
-  IOFun   _     -> "<i/o primitive>"
-  Port    _     -> "<i/o port>"
+    PrimFun _     -> "<primitive>"
+    IOFun   _     -> "<i/o primitive>"
+    Port    _     -> "<i/o port>"
 
   where
     unwordsVal = unwords . map showVal
@@ -113,7 +117,7 @@ instance Show LispError where
     NumArgs i vals     -> "Arity error: expected " ++ show i ++ " args, got " ++ show (length vals)
     TypeMismatch t v   -> "Type mismatch: expected " ++ t ++ ", got: " ++ show v
     ParseError doc     -> show doc
-    BadSpecialForm f v -> "Bad special form: expected " ++ f ++ ", got: " ++ show v
+    BadSpecialForm s v -> "Bad special form: " ++ s ++ ": " ++ show v
     NotFunction f      -> "Not a function: " ++ show f
     UnboundVar name    -> "Unbound variable: " ++ name
     Default s          -> s

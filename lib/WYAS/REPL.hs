@@ -27,7 +27,8 @@ import qualified Data.Map as Map
 
 parseMultiLine :: Parser a -> InputT EvalIO (Maybe a)
 parseMultiLine parseLine =
-  runMaybeT $ go . flip feed (stepParser (release d *> parseLine) mempty mempty) =<< getInput ">>> "
+  runMaybeT $
+    go . (`feed` initStep) =<< getInput ">>> "
 
   where
     go :: Step a -> MaybeT (InputT EvalIO) a
@@ -35,7 +36,7 @@ parseMultiLine parseLine =
     go (StepDone _ a)   = return a
     go (StepCont r _ f) = go . f . snoc r =<< getInput "... "
 
-    d = Columns 0 0
+    initStep = stepParser (release (Columns 0 0) *> parseLine) mempty mempty
 
 evalPrint :: LispVal -> InputT EvalIO ()
 evalPrint val = do

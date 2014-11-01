@@ -89,12 +89,13 @@ parseQuoted = do
   return $ List [Atom "quote", e]
 
 parseListOrPairs :: Parser LispVal
-parseListOrPairs = do
-  char '(' *> skipSpaceAndComment
-  es  <- exprs
-  val <- (dottedList es <?> "dotted list") <|> pure (List es)
-  _   <- char ')'
-  return val
+parseListOrPairs =
+  do
+    char '(' *> skipSpaceAndComment
+    es  <- exprs
+    val <- (dottedList es <?> "dotted list") <|> pure (List es)
+    _   <- char ')'
+    return val
 
   where
     dottedList es = DottedList es <$> (char '.' *> skipSpaceAndComment *> parseExpr)
@@ -104,7 +105,7 @@ parseVector = Vector . V.fromList <$> vec where
   vec = (string "#(" *> exprs <* char ')') <?> "vector"
 
 exprs :: Parser [LispVal]
-exprs = parseExpr `endBy` skipSpaceAndComment <?> "expr..."
+exprs = (parseExpr `endBy` skipSpaceAndComment) <?> "expr..."
 
 skipComment :: Parser ()
 skipComment = (string ";;" *> many (notChar '\n') *> pure ()) <?> "comment"

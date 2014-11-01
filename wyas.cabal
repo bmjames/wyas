@@ -52,6 +52,7 @@ test-suite tests
   hs-source-dirs:      tests
   build-depends:       base
                      , wyas
+                     , vector
                      , HUnit >=1.2.5
                      , test-framework
                      , test-framework-hunit

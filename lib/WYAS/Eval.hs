@@ -104,7 +104,7 @@ letToLambda defns body = case defns of
   badForm : _ -> error $ BadSpecialForm "Bad let binding" badForm
 
 evalExprList :: [LispVal] -> EvalIO LispVal
-evalExprList = foldlM (\_ expr -> eval expr) (List [])
+evalExprList = foldlM (const eval) (List [])
 
 makeFun :: Maybe String -> [LispVal] -> LispVal -> Eval LispVal
 makeFun varargs params body = do
@@ -341,5 +341,6 @@ eqvInternal (Number i) (Number j) = i == j
 eqvInternal (Float i) (Float j) = i == j
 eqvInternal (Bool b1) (Bool b2) = b1 == b2
 eqvInternal (Character c1) (Character c2) = c1 == c2
+eqvInternal (String s1) (String s2) = s1 == s2
 eqvInternal (Port h1) (Port h2) = h1 == h2
 eqvInternal _ _ = False
