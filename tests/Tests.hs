@@ -10,13 +10,14 @@ import WYAS.Data
 import qualified Data.Vector as V
 
 main :: IO ()
-main = defaultMain parsingTests
+main = defaultMain parserTests
 
-parsingTests =
+parserTests =
   [ testCase "atom" atom
   , testCase "hex literal" hexLit
   , testCase "binary literal" binLit
   , testCase "oct literal" octLit
+  , testCase "boolean" bool
   , testCase "vector" vector
   , testCase "string" string
   , testCase "quoted" quoted
@@ -33,8 +34,10 @@ string = testReadExpr "\"foobar\"" $ String "foobar"
 quoted = testReadExpr "'(a b)"     $ List [Atom "quote", List [Atom "a", Atom "b"]]
 list   = testReadExpr "(a b c)"    $ List [Atom "a", Atom "b", Atom "c"]
 pair   = testReadExpr "(a . b)"    $ DottedList [Atom "a"] (Atom "b")
+bool   = testReadExpr "(#t #f)"    $ List [Bool True, Bool False]
 
 testReadExpr :: String -> LispVal -> Assertion
 testReadExpr exp val = case runThrowsError $ readExpr "test" exp of
   Left  e -> assertString $ "Parse error: " ++ show e
-  Right v -> assertBool (show v ++ " is not equivalent to " ++ show val) $ eqvInternal v val
+  Right v -> let msg = show v ++ " is not equivalent to " ++ show val
+             in assertBool msg $ eqvInternal v val

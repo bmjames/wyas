@@ -63,6 +63,10 @@ parseNumber = (parseInt <|> char '#' *> parseNumber') <?> "number"
                <|> char 'b' *> parseBin
                <|> char 'd' *> parseFloat
 
+parseBool :: Parser LispVal
+parseBool = Bool <$> bool' <?> "boolean"
+  where bool' = char '#' *> (True <$ char 't' <|> False <$ char 'f')
+
 parseBin :: Parser LispVal
 parseBin = parseBin' <?> "binary" where
   parseBin' = Number <$> fst . head . readBin <$> some binDigit
