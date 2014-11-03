@@ -25,7 +25,7 @@ symbol :: Parser Char
 symbol = oneOf "-!#$%&|*+/:<=>?@^_~"
 
 parseString :: Parser LispVal
-parseString = String <$> (char '"' *> many char' <* char '"') <?> "string"
+parseString = String <$> (char '"' *> many char' <* char '"')
   where
     char' = (char '\\' *> escapedChar) <|> notChar '"'
     escapedChar =     ('"'  <$ char '"')
@@ -46,26 +46,22 @@ parseChar = Character <$> char'
     iChar c   = char (toLower c) <|> char (toUpper c)
 
 parseAtom :: Parser LispVal
-parseAtom = atom <?> "symbol" where
-  atom = do first <- letter <|> symbol
-            rest  <- many (letter <|> digit <|> symbol)
-            return $ case first:rest of
-              "#t" -> Bool True
-              "#f" -> Bool False
-              sym  -> Atom sym
+parseAtom =
+  do first <- letter <|> symbol
+     rest  <- many (letter <|> digit <|> symbol)
+     return $ case first:rest of
+       "#t" -> Bool True
+       "#f" -> Bool False
+       sym  -> Atom sym
 
 parseNumber :: Parser LispVal
-parseNumber = (parseInt <|> char '#' *> parseNumber') <?> "number"
+parseNumber = parseInt <|> char '#' *> parseNumber'
   where
     parseInt     = Number . read <$> some digit
     parseNumber' = char 'o' *> parseOct
                <|> char 'x' *> parseHex
                <|> char 'b' *> parseBin
                <|> char 'd' *> parseFloat
-
-parseBool :: Parser LispVal
-parseBool = Bool <$> bool' <?> "boolean"
-  where bool' = char '#' *> (True <$ char 't' <|> False <$ char 'f')
 
 parseBin :: Parser LispVal
 parseBin = parseBin' <?> "binary" where
@@ -105,8 +101,7 @@ parseListOrPairs =
     dottedList es = DottedList es <$> (char '.' *> skipSpaceAndComment *> parseExpr)
 
 parseVector :: Parser LispVal
-parseVector = Vector . V.fromList <$> vec where
-  vec = (string "#(" *> exprs <* char ')') <?> "vector"
+parseVector = Vector . V.fromList <$> (string "#(" *> exprs <* char ')')
 
 exprs :: Parser [LispVal]
 exprs = (parseExpr `endBy` skipSpaceAndComment) <?> "expr..."
@@ -124,8 +119,8 @@ parseExpr :: Parser LispVal
 parseExpr = (try parseNumber <?> "number")
             <|> (try parseChar <?> "char")
             <|> parseVector
-            <|> parseAtom
-            <|> parseString
+            <|> (parseAtom <?> "atom")
+            <|> (parseString <?> "string")
             <|> parseQuoted
             <|> parseListOrPairs
 
