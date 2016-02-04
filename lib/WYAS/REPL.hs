@@ -11,7 +11,7 @@ import Control.Monad.IO.Class           (MonadIO, liftIO)
 import Control.Monad.Trans.Class        (lift)
 import Control.Monad.Trans.Maybe        (MaybeT(..), runMaybeT)
 
-import Text.Trifecta
+import Text.Trifecta hiding (line)
 import Text.Trifecta.Delta              (Delta(Columns))
 
 import Data.Foldable                    (traverse_)
@@ -31,18 +31,21 @@ parseMultiLine parseLine =
 
   where
     go :: Step a -> MaybeT (InputT EvalIO) a
-    go (StepFail _ doc) = MaybeT $ Nothing <$ putErrLn (show doc)
-    go (StepDone _ a)   = return a
+    go (StepFail _ e) = failWithError (show e)
+    go (StepDone _ a) = return a
+    go (StepCont _ (Success a) _) = return a
     go (StepCont r _ f) = go . f . snoc r =<< getInput "... "
 
     initStep = stepParser (release (Columns 0 0) *> parseLine) mempty mempty
+
+    failWithError e = MaybeT (Nothing <$ putErrLn e)
 
 evalPrint :: LispVal -> InputT EvalIO ()
 evalPrint val = do
   env    <- lift getEnv
   result <- liftIO $ runEval env $ eval val
   case result of
-    Left err            -> putErrLn $ show err
+    Left e              -> putErrLn $ show e
     Right (out, newEnv) -> do outputStrLn $ show out
                               lift $ setEnv newEnv
 
@@ -59,15 +62,15 @@ getInput prompt = do
 repl :: InputT EvalIO ()
 repl = forever $ parseMultiLine parseLine >>= traverse_ evalPrint
   where
-    parseLine = skipSpaceAndComment *> parseExpr
+    parseLine = skipSpaceAndComment *> parseExpr <* skipSpaceAndComment <* eof
 
 replMain :: IO ()
 replMain =
   void $ runEval primitiveBindings $ runInputT settings repl
 
-settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
-
   where
+    settings = setComplete (addFilenameCompletion completeIdents) defaultSettings
+
     completeIdents = completeWord Nothing " \n\t()'" matchPrefix
 
     matchPrefix s = map simpleCompletion . filter (isPrefixOf s) . idents <$> getEnv
