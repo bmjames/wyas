@@ -14,7 +14,6 @@ import Text.Trifecta.Delta (Delta(Directed))
 import qualified Text.Trifecta as Trifecta
 
 import Data.Char             (digitToInt, toLower, toUpper)
-import Data.Traversable      (traverse)
 import Data.Functor          (void)
 import qualified Data.ByteString.UTF8 as UTF8
 import qualified Data.Vector as V
@@ -67,7 +66,7 @@ parseBin :: Parser LispVal
 parseBin = parseBin' <?> "binary" where
   parseBin' = Number <$> fst . head . readBin <$> some binDigit
   binDigit  = satisfy (\c -> c == '0' || c == '1') <?> "'0' or '1'"
-  readBin   = readInt 2 (`elem` "01") digitToInt
+  readBin   = readInt 2 (`elem` ['0','1']) digitToInt
 
 parseOct :: Parser LispVal
 parseOct = Number <$> fst . head . readOct <$> some octDigit

@@ -6,24 +6,23 @@ import WYAS.Data
 import WYAS.Eval hiding (null)
 import WYAS.Parser
 
-import Control.Applicative       ((*>), (<$>), (<$))
-import Control.Monad             (forever, guard, mzero, void)
-import Control.Monad.IO.Class    (MonadIO, liftIO)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad                    (forever, guard, mzero, void)
+import Control.Monad.IO.Class           (MonadIO, liftIO)
+import Control.Monad.Trans.Class        (lift)
+import Control.Monad.Trans.Maybe        (MaybeT(..), runMaybeT)
 
 import Text.Trifecta
-import Text.Trifecta.Delta (Delta(Columns))
+import Text.Trifecta.Delta              (Delta(Columns))
 
-import Data.Foldable (traverse_)
-import Data.List     (isPrefixOf)
-import Data.ByteString.Char8 (ByteString, pack)
-import Data.Monoid   (mempty)
-import Data.Semigroup.Reducer (snoc)
+import Data.Foldable                    (traverse_)
+import Data.List                        (isPrefixOf)
+import Data.ByteString.Char8            (ByteString, pack)
+import Data.Semigroup.Reducer           (snoc)
 
 import System.Console.Haskeline
 
 import qualified Data.Map as Map
+
 
 parseMultiLine :: Parser a -> InputT EvalIO (Maybe a)
 parseMultiLine parseLine =
