@@ -31,7 +31,7 @@ parseMultiLine parseLine =
 
   where
     go :: Step a -> MaybeT (InputT EvalIO) a
-    go (StepFail _ e) = failWithError (show e)
+    go (StepFail _ e) = failWithError (show $ _errDoc e)
     go (StepDone _ a) = return a
     go (StepCont _ (Success a) _) = return a
     go (StepCont r _ f) = go . f . snoc r =<< getInput "... "

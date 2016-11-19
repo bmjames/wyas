@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 executable wyasi
   main-is:             Main.hs
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.7 && <4.9
+  build-depends:       base >=4.7 && <4.10
                      , wyas
                      , text
                      , transformers
@@ -29,7 +29,7 @@ executable wyasi
 
 library
   exposed-modules:     WYAS.Data, WYAS.Eval, WYAS.Parser, WYAS.REPL
-  build-depends:       base >=4.7 && <4.9
+  build-depends:       base >=4.7 && <4.10
                      , bytestring
                      , fingertree
                      , utf8-string

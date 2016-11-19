@@ -127,7 +127,7 @@ readOrThrow :: Parser a -> FilePath -> String -> ThrowsError a
 readOrThrow parser file s =
   case Trifecta.parseString parser (Directed (UTF8.fromString file) 0 0 0 0) s of
     Success a -> return a
-    Failure d -> throwError $ ParseError d
+    Failure e -> throwError . ParseError $ _errDoc e
 
 readExpr :: FilePath -> String -> ThrowsError LispVal
 readExpr = readOrThrow (skipSpaceAndComment *> parseExpr <* skipSpaceAndComment)
