@@ -16,7 +16,7 @@ import Text.Trifecta.Delta              (Delta(Columns))
 
 import Data.Foldable                    (traverse_)
 import Data.List                        (isPrefixOf)
-import Data.ByteString.Char8            (ByteString, pack)
+import Data.ByteString.UTF8             (ByteString, fromString)
 import Data.Semigroup.Reducer           (snoc)
 
 import System.Console.Haskeline
@@ -57,7 +57,7 @@ getInput prompt = do
   maybeLine <- lift $ getInputLine prompt
   line      <- maybe mzero return maybeLine
   guard $ not $ null line
-  return $ pack $ line ++ "\n"
+  return $ fromString $ line ++ "\n"
 
 repl :: InputT EvalIO ()
 repl = forever $ parseMultiLine parseLine >>= traverse_ evalPrint
